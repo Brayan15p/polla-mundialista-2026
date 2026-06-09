@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>POLLA MUNDIALISTA 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: #050508;
+      color: #fff;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+      font-family: 'Barlow', sans-serif;
+    }
+
+    /* Spinner while JS loads */
+    #root:empty::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: #050508 url('uploads/pasted-1781013290237-0.png') center/30% no-repeat;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.25); border-radius: 2px; }
+
+    /* Hide spinners on number inputs */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* Focus ring */
+    input:focus { border-color: rgba(255,215,0,0.5) !important; }
+
+    /* ─── KEYFRAMES ─────────────────────────────────────────────────────── */
+
+    @keyframes wc-rotateSlow {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    @keyframes wc-float {
+      0%, 100% { transform: translateY(0px);  }
+      50%       { transform: translateY(-14px); }
+    }
+
+    @keyframes wc-goldPulseText {
+      0%, 100% { text-shadow: 0 0 40px rgba(255,215,0,0.7), 0 0 80px rgba(255,165,0,0.3); }
+      50%       { text-shadow: 0 0 70px rgba(255,215,0,1.0), 0 0 120px rgba(255,165,0,0.6); }
+    }
+
+    @keyframes wc-cardGlow {
+      0%, 100% { box-shadow: 0 0 0px rgba(255,215,0,0); }
+      50%       { box-shadow: 0 0 28px rgba(255,215,0,0.22); }
+    }
+
+    @keyframes wc-livePulse {
+      0%, 100% { opacity: 1;   transform: scale(1);   }
+      50%       { opacity: 0.3; transform: scale(0.75); }
+    }
+
+    @keyframes wc-slideUp {
+      from { transform: translateY(28px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    @keyframes wc-fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes wc-scaleIn {
+      from { transform: scale(0.88); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+
+    @keyframes wc-trophySpin {
+      0%   { transform: rotateY(0deg);   }
+      100% { transform: rotateY(360deg); }
+    }
+
+    /* Smooth page transitions */
+    [data-view] { animation: wc-fadeIn 0.3s ease; }
+
+    /* Bounce on bet save */
+    @keyframes wc-bounceIn {
+      0%   { transform: scale(0.6); opacity: 0; }
+      60%  { transform: scale(1.12); }
+      100% { transform: scale(1);    opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Data (plain JS, no JSX) -->
+  <script src="wc-data.js"></script>
+
+  <!-- React Components (Babel JSX) -->
+  <script type="text/babel" src="wc-intro.jsx"></script>
+  <script type="text/babel" src="wc-screens.jsx"></script>
+  <script type="text/babel" src="wc-app.jsx"></script>
+</body>
+</html>

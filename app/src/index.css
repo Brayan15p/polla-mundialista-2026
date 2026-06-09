@@ -1,0 +1,76 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #050508;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  font-family: 'Barlow', sans-serif;
+}
+
+#root:empty::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: #050508 url('/uploads/pasted-1781013290237-0.png') center/30% no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.25); border-radius: 2px; }
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+input:focus { border-color: rgba(255,215,0,0.5) !important; }
+
+/* ─── KEYFRAMES ─────────────────────────────────────────────────────── */
+@keyframes wc-rotateSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes wc-float {
+  0%, 100% { transform: translateY(0px);  }
+  50%       { transform: translateY(-14px); }
+}
+@keyframes wc-goldPulseText {
+  0%, 100% { text-shadow: 0 0 40px rgba(255,215,0,0.7), 0 0 80px rgba(255,165,0,0.3); }
+  50%       { text-shadow: 0 0 70px rgba(255,215,0,1.0), 0 0 120px rgba(255,165,0,0.6); }
+}
+@keyframes wc-cardGlow {
+  0%, 100% { box-shadow: 0 0 0px rgba(255,215,0,0); }
+  50%       { box-shadow: 0 0 28px rgba(255,215,0,0.22); }
+}
+@keyframes wc-livePulse {
+  0%, 100% { opacity: 1;   transform: scale(1);   }
+  50%       { opacity: 0.3; transform: scale(0.75); }
+}
+@keyframes wc-slideUp {
+  from { transform: translateY(28px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes wc-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes wc-scaleIn {
+  from { transform: scale(0.88); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes wc-trophySpin {
+  0%   { transform: rotateY(0deg);   }
+  100% { transform: rotateY(360deg); }
+}
+@keyframes wc-scan {
+  0%   { top: 0%; }
+  100% { top: 100%; }
+}
+[data-view] { animation: wc-fadeIn 0.3s ease; }
+@keyframes wc-bounceIn {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1);    opacity: 1; }
+}

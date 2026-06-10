@@ -70,6 +70,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
       borderRadius: 18, marginBottom: 12, overflow: 'hidden',
       boxShadow: saved ? '0 0 32px rgba(255,215,0,0.15)' : isLive ? '0 0 24px rgba(239,68,68,0.1)' : 'none',
       transition: 'box-shadow 0.5s ease, border-color 0.5s ease',
+      animation: 'wc-popIn 0.35s ease both',
     }}>
       <div style={{ height: 3, background: `linear-gradient(90deg,${groupColor},${groupColor}55,transparent)` }} />
 
@@ -84,7 +85,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
               </span>
             )}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontFamily: "'Barlow',sans-serif", textAlign: 'right', maxWidth: 170, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', fontFamily: "'Barlow',sans-serif", textAlign: 'right', maxWidth: 170, lineHeight: 1.4 }}>
             {match.date.split('T')[1]?.slice(0, 5)} · {match.venue}
           </div>
         </div>

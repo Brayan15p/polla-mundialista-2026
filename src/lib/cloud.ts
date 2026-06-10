@@ -95,6 +95,15 @@ export async function cloudUpdateResult(matchId: string, home: number, away: num
   );
 }
 
+// Push kickoff times to the `matches` table (admin only) so the server-side
+// anti-fraud trigger can enforce the betting deadline. See supabase/anti_fraud.sql.
+export async function cloudSyncMatches(matches: { id: string; date: string }[]): Promise<{ error?: string }> {
+  if (!supabase) return { error: 'Supabase no configurado' };
+  const rows = matches.map(m => ({ id: m.id, kickoff: m.date }));
+  const { error } = await supabase.from('matches').upsert(rows, { onConflict: 'id' });
+  return { error: error?.message };
+}
+
 // ── Reads ───────────────────────────────────────────────────────────────
 export async function cloudLoadAll(): Promise<CloudData> {
   const empty: CloudData = { users: [], bets: {}, matchResults: {} };

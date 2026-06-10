@@ -78,6 +78,28 @@ database, real accounts, live bets and live results:
 5. `npm run dev`. The app now uses Supabase for auth, bets and results, and
    every device updates live via Realtime. Logic lives in `src/lib/cloud.ts`.
 
+### Anti-fraud (server-side deadline)
+
+`schema.sql` already restricts each player to their own bets and lets only the
+admin write results (Row Level Security). To also make the **5-minute betting
+lock un-bypassable** — even by calling the API directly — run
+`supabase/anti_fraud.sql`, then sign in as admin and press **🔄 Sincronizar
+partidos** in the admin panel. A database trigger then rejects any bet placed
+within 5 minutes of kickoff.
+
+## Player photos
+
+Drop an image at `public/players/<id>.jpg` (e.g. `messi.jpg`, `ronaldo.jpg`,
+`pele.jpg`) and it appears automatically on the avatar and the FUT-style card;
+otherwise the gold silhouette is shown. See `public/players/README.txt` for the
+full id list. Use freely-licensed images.
+
+## Tests
+
+```bash
+npm test     # vitest — scoring, 0-0 default rule, deadline, standings
+```
+
 ## Deploy (Vercel)
 
 The app lives at the **repository root**, so Vercel auto-detects it as a Vite

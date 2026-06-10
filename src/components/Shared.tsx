@@ -40,6 +40,7 @@ export function BgLayer() {
 }
 
 export function AvatarBubble({ player, size = 40 }: { player?: Player | null; size?: number }) {
+  const [imgFailed, setImgFailed] = useState(false);
   if (!player) return (
     <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,215,0,0.35)', flexShrink: 0 }} />
   );
@@ -51,10 +52,16 @@ export function AvatarBubble({ player, size = 40 }: { player?: Player | null; si
       display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
       boxShadow: `0 0 ${size * 0.4}px ${player.kitA}55`,
     }}>
-      <svg viewBox="0 0 60 90" width={size * 0.65} height={size * 0.85} fill="none">
-        <g fill={player.tier === 'legend' || player.tier === 'gold' ? '#FFD700' : 'rgba(255,255,255,0.9)'}
-          dangerouslySetInnerHTML={{ __html: player.silhouette || `<circle cx="30" cy="12" r="9"/><rect x="17" y="23" width="26" height="26" rx="4"/><rect x="13" y="47" width="12" height="26" rx="3"/><rect x="35" y="47" width="12" height="26" rx="3"/>` }} />
-      </svg>
+      {/* Real photo if dropped in public/players/<id>.jpg, else the silhouette. */}
+      {!imgFailed ? (
+        <img src={`/players/${player.id}.jpg`} alt={player.name} onError={() => setImgFailed(true)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <svg viewBox="0 0 60 90" width={size * 0.65} height={size * 0.85} fill="none">
+          <g fill={player.tier === 'legend' || player.tier === 'gold' ? '#FFD700' : 'rgba(255,255,255,0.9)'}
+            dangerouslySetInnerHTML={{ __html: player.silhouette || `<circle cx="30" cy="12" r="9"/><rect x="17" y="23" width="26" height="26" rx="4"/><rect x="13" y="47" width="12" height="26" rx="3"/><rect x="35" y="47" width="12" height="26" rx="3"/>` }} />
+        </svg>
+      )}
     </div>
   );
 }

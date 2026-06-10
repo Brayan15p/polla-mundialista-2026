@@ -16,6 +16,7 @@ export function FifaCard({ player, selected, onClick }: { player: Player; select
   const ts = tierStyles[player.tier] || tierStyles.bronze;
   const flag = FLAGS[player.country] || '🏴';
   const isPremium = player.tier === 'legend' || player.tier === 'gold';
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   return (
     <div onClick={onClick} style={{
@@ -47,12 +48,17 @@ export function FifaCard({ player, selected, onClick }: { player: Player; select
       {/* Flag */}
       <div style={{ fontSize: 30, margin: '4px 0', lineHeight: 1 }}>{flag}</div>
 
-      {/* Silhouette SVG */}
-      <div style={{ margin: '6px auto 2px', width: 52, height: 68 }}>
-        <svg viewBox="0 0 60 90" width="52" height="68" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g fill={isPremium ? '#FFD700' : player.kitA} opacity="0.85"
-            dangerouslySetInnerHTML={{ __html: player.silhouette || '' }} />
-        </svg>
+      {/* Real photo (public/players/<id>.jpg) or the silhouette as fallback */}
+      <div style={{ margin: '6px auto 2px', width: 56, height: 68, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        {!photoFailed ? (
+          <img src={`/players/${player.id}.jpg`} alt={player.name} onError={() => setPhotoFailed(true)}
+            style={{ width: 64, height: 68, objectFit: 'cover', objectPosition: 'top center', borderRadius: 8 }} />
+        ) : (
+          <svg viewBox="0 0 60 90" width="52" height="68" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g fill={isPremium ? '#FFD700' : player.kitA} opacity="0.85"
+              dangerouslySetInnerHTML={{ __html: player.silhouette || '' }} />
+          </svg>
+        )}
       </div>
 
       {/* Kit color stripe */}

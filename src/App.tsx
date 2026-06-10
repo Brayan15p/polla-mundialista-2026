@@ -5,8 +5,9 @@ import { loadState, saveState, type AppState, type User, type View } from './lib
 import { supabaseEnabled } from './lib/supabase';
 import {
   cloudSignIn, cloudSignUp, cloudSignOut, cloudCurrentUser, cloudLoadAll,
-  cloudSetPlayer, cloudPlaceBet, cloudUpdateResult, cloudSubscribe,
+  cloudSetPlayer, cloudPlaceBet, cloudUpdateResult, cloudSubscribe, cloudSyncMatches,
 } from './lib/cloud';
+import { Tutorial } from './components/Tutorial';
 import { IntroAnimation } from './components/Intro';
 import { AuthScreen, type RegisterPayload } from './components/Auth';
 import { PlayerSelectScreen } from './components/PlayerSelect';
@@ -29,6 +30,8 @@ export default function App() {
   const [showIntro, setShowIntro] = useState(true);
   const [baseMatches, setBaseMatches] = useState<Match[]>([]);
   const [dataSource, setDataSource] = useState<'live' | 'mock'>('mock');
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [pendingTutorial, setPendingTutorial] = useState(false);
 
   // Load match data (live API with mock fallback)
   useEffect(() => {
@@ -87,11 +90,13 @@ export default function App() {
       const res = await cloudSignUp(username, email, password, joinPool);
       if (res.error) { alert(res.error); return; }
       if (res.needsConfirm) { alert('Te enviamos un correo para confirmar tu cuenta. Confírmalo y vuelve a iniciar sesión.'); return; }
+      setPendingTutorial(true);
       setState(p => ({ ...p, currentUser: res.user!, view: 'playerSelect' }));
       return;
     }
     if (state.users.find(u => u.email === email)) { alert('Este correo ya está registrado.'); return; }
     const nu: User = { id: 'u' + Date.now(), username, email, password, playerId: null, poolJoined: !!joinPool, createdAt: new Date().toISOString() };
+    setPendingTutorial(true);
     setState(p => ({ ...p, users: [...p.users, nu], currentUser: nu, view: 'playerSelect' }));
   };
 
@@ -103,6 +108,8 @@ export default function App() {
       users: p.users.map(u => (u.id === p.currentUser?.id ? { ...u, playerId } : u)),
       view: 'dashboard',
     }));
+    // New players get a quick football-flavoured tutorial after picking a card.
+    if (pendingTutorial) { setShowTutorial(true); setPendingTutorial(false); }
   };
 
   const placeBet = (matchId: string, home: number, away: number) => {
@@ -140,11 +147,19 @@ export default function App() {
 
   if (!currentUser) return <AuthScreen onLogin={login} onRegister={register} />;
   if (!currentUser.playerId) return <PlayerSelectScreen onSelect={selectPlayer} />;
-  if (showAdmin) return <AdminScreen matches={matches} onClose={() => setState(p => ({ ...p, showAdmin: false }))} onUpdateResult={updateResult} />;
+  if (showAdmin) return (
+    <AdminScreen
+      matches={matches}
+      onClose={() => setState(p => ({ ...p, showAdmin: false }))}
+      onUpdateResult={updateResult}
+      onSyncMatches={supabaseEnabled ? () => cloudSyncMatches(matches) : undefined}
+    />
+  );
 
   return (
     <div style={{ background: '#050508', minHeight: '100vh' }}>
       <BgLayer />
+      {showTutorial && <Tutorial user={currentUser} onClose={() => setShowTutorial(false)} />}
       <NavBar user={currentUser} view={view} onNavigate={go} onLogout={logout} userPoints={userTotalPoints} />
 
       {dataSource === 'live' && (

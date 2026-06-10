@@ -5,13 +5,23 @@ interface AdminScreenProps {
   matches: Match[];
   onClose: () => void;
   onUpdateResult: (matchId: string, home: number, away: number) => void;
+  onSyncMatches?: () => Promise<{ error?: string }>;
 }
 
-export function AdminScreen({ matches, onClose, onUpdateResult }: AdminScreenProps) {
+export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches }: AdminScreenProps) {
   const [vals, setVals] = useState<Record<string, { home: string; away: string }>>(
     Object.fromEntries(matches.map(m => [m.id, { home: m.homeScore?.toString() ?? '', away: m.awayScore?.toString() ?? '' }]))
   );
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [syncMsg, setSyncMsg] = useState('');
+
+  const sync = async () => {
+    if (!onSyncMatches) return;
+    setSyncMsg('Sincronizando…');
+    const res = await onSyncMatches();
+    setSyncMsg(res.error ? `Error: ${res.error}` : '✓ Partidos sincronizados — bloqueo de apuestas activo');
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
 
   const save = (id: string) => {
     const h = parseInt(vals[id].home), a = parseInt(vals[id].away);
@@ -31,6 +41,21 @@ export function AdminScreen({ matches, onClose, onUpdateResult }: AdminScreenPro
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontFamily: "'Barlow',sans-serif" }}>Ingresa los resultados para calcular puntos</div>
           </div>
         </div>
+
+        {onSyncMatches && (
+          <div style={{ marginBottom: 20, padding: '14px 16px', background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.22)', borderRadius: 14 }}>
+            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13, color: '#FFD700', letterSpacing: 1 }}>🛡️ ANTI-FRAUDE</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: "'Barlow',sans-serif", margin: '4px 0 10px', lineHeight: 1.5 }}>
+              Sincroniza los horarios de los partidos a la nube para activar el bloqueo de apuestas (5 min antes del pitazo) en el servidor.
+            </div>
+            <button onClick={sync} style={{
+              padding: '10px 18px', background: 'linear-gradient(135deg,#FFE566,#C9A62C)', border: 'none',
+              borderRadius: 10, color: '#000', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+              fontSize: 13, letterSpacing: 1, cursor: 'pointer',
+            }}>🔄 SINCRONIZAR PARTIDOS</button>
+            {syncMsg && <span style={{ marginLeft: 12, fontSize: 12, color: 'rgba(255,255,255,0.7)', fontFamily: "'Barlow',sans-serif" }}>{syncMsg}</span>}
+          </div>
+        )}
         {matches.map(m => {
           const v = vals[m.id] || { home: '', away: '' };
           const inpS: CSSProperties = { width: 52, height: 48, textAlign: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 8, color: '#FFD700', fontFamily: "'Anton',sans-serif", fontSize: 26, outline: 'none' };

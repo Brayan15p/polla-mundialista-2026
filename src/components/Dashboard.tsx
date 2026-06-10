@@ -1,4 +1,4 @@
-import { FLAGS, PLAYERS, calculatePoints, type Match } from '../lib/data';
+import { FLAGS, PLAYERS, pointsFor, type Match } from '../lib/data';
 import type { User, Bet, View } from '../lib/state';
 import { AvatarBubble, LiveCard } from './Shared';
 
@@ -14,21 +14,14 @@ export function DashboardScreen({ user, users, bets, matches, onNavigate }: Dash
   const player = PLAYERS.find(p => p.id === user.playerId);
   const userBets = bets[user.id] || {};
 
-  const totalPoints = matches.reduce((s, m) => {
-    if (m.status !== 'finished') return s;
-    const b = userBets[m.id]; if (!b) return s;
-    return s + calculatePoints(b.home, b.away, m.homeScore!, m.awayScore!);
-  }, 0);
+  // 0–0 default rule: every finished match scores, even without an explicit bet.
+  const totalPoints = matches.reduce((s, m) => s + pointsFor(userBets[m.id], m), 0);
 
   const poolAmount = users.filter(u => u.poolJoined).length * 100000;
 
   const allRanks = [...users].map(u => {
     const ub = bets[u.id] || {};
-    return matches.reduce((s, m) => {
-      if (m.status !== 'finished') return s;
-      const b = ub[m.id]; if (!b) return s;
-      return s + calculatePoints(b.home, b.away, m.homeScore!, m.awayScore!);
-    }, 0);
+    return matches.reduce((s, m) => s + pointsFor(ub[m.id], m), 0);
   }).sort((a, b) => b - a);
   const rank = allRanks.findIndex(p => p <= totalPoints) + 1;
 
@@ -128,7 +121,7 @@ export function DashboardScreen({ user, users, bets, matches, onNavigate }: Dash
           <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: 3, color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>ÚLTIMOS RESULTADOS</div>
           {recent.map(m => {
             const bet = userBets[m.id];
-            const pts = bet ? calculatePoints(bet.home, bet.away, m.homeScore!, m.awayScore!) : null;
+            const pts = pointsFor(bet, m);
             const ptC = pts === 3 ? '#22C55E' : pts === 1 ? '#FFD700' : '#4B5563';
             return (
               <div key={m.id} style={{
@@ -145,16 +138,14 @@ export function DashboardScreen({ user, users, bets, matches, onNavigate }: Dash
                     </div>
                     {bet
                       ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow',sans-serif" }}>Tu apuesta: {bet.home}–{bet.away}</div>
-                      : <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', fontFamily: "'Barlow',sans-serif" }}>Sin apuesta</div>}
+                      : <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', fontFamily: "'Barlow',sans-serif" }}>Por defecto: 0–0</div>}
                   </div>
                   <span style={{ fontSize: 26 }}>{FLAGS[m.away]}</span>
                 </div>
-                {pts !== null && (
-                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                    <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 28, color: ptC, lineHeight: 1 }}>+{pts}</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: 1 }}>PTS</div>
-                  </div>
-                )}
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 28, color: ptC, lineHeight: 1 }}>+{pts}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: 1 }}>PTS</div>
+                </div>
               </div>
             );
           })}

@@ -1,7 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { calculatePoints, type Match } from './lib/data';
+import { pointsFor, type Match } from './lib/data';
 import { fetchMatches } from './lib/api';
 import { loadState, saveState, type AppState, type User, type View } from './lib/state';
+import { supabaseEnabled } from './lib/supabase';
+import {
+  cloudSignIn, cloudSignUp, cloudSignOut, cloudCurrentUser, cloudLoadAll,
+  cloudSetPlayer, cloudPlaceBet, cloudUpdateResult, cloudSubscribe,
+} from './lib/cloud';
 import { IntroAnimation } from './components/Intro';
 import { AuthScreen, type RegisterPayload } from './components/Auth';
 import { PlayerSelectScreen } from './components/PlayerSelect';
@@ -14,7 +19,13 @@ import { ProfileScreen } from './components/Profile';
 import { AdminScreen } from './components/Admin';
 
 export default function App() {
-  const [state, setState] = useState<AppState>(loadState);
+  // In cloud mode, data comes from Supabase — start empty. In local mode, use
+  // the bundled demo state from localStorage.
+  const [state, setState] = useState<AppState>(() =>
+    supabaseEnabled
+      ? { users: [], currentUser: null, bets: {}, matchResults: {}, view: 'auth', showAdmin: false }
+      : loadState(),
+  );
   const [showIntro, setShowIntro] = useState(true);
   const [baseMatches, setBaseMatches] = useState<Match[]>([]);
   const [dataSource, setDataSource] = useState<'live' | 'mock'>('mock');
@@ -29,8 +40,26 @@ export default function App() {
     return () => ctrl.abort();
   }, []);
 
-  // Persist on change
-  useEffect(() => { saveState(state); }, [state]);
+  // Cloud mode: restore the logged-in user, load shared data, and keep every
+  // device in sync via Realtime.
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+    let active = true;
+    const refresh = async () => {
+      const data = await cloudLoadAll();
+      if (active) setState(p => ({ ...p, users: data.users, bets: data.bets, matchResults: data.matchResults }));
+    };
+    (async () => {
+      const u = await cloudCurrentUser();
+      if (active && u) setState(p => ({ ...p, currentUser: u, view: u.playerId ? 'dashboard' : 'playerSelect' }));
+      await refresh();
+    })();
+    const unsub = cloudSubscribe(refresh);
+    return () => { active = false; unsub(); };
+  }, []);
+
+  // Persist on change (local mode only — cloud mode is the source of truth).
+  useEffect(() => { if (!supabaseEnabled) saveState(state); }, [state]);
 
   // Merge admin result overrides into match list
   const matches = useMemo(() => baseMatches.map(m => {
@@ -41,19 +70,33 @@ export default function App() {
   // ── Handlers ─────────────────────────────────────────────────────────
   const introComplete = () => { setShowIntro(false); };
 
-  const login = (email: string, password: string) => {
+  const login = async (email: string, password: string) => {
+    if (supabaseEnabled) {
+      const res = await cloudSignIn(email, password);
+      if (res.error || !res.user) { alert(res.error || 'No se pudo iniciar sesión.'); return; }
+      setState(p => ({ ...p, currentUser: res.user!, view: res.user!.playerId ? 'dashboard' : 'playerSelect' }));
+      return;
+    }
     const u = state.users.find(u => u.email === email && u.password === password);
     if (!u) { alert('Credenciales incorrectas. Prueba el acceso demo.'); return; }
     setState(p => ({ ...p, currentUser: u, view: 'dashboard' }));
   };
 
-  const register = ({ username, email, password, joinPool }: RegisterPayload) => {
+  const register = async ({ username, email, password, joinPool }: RegisterPayload) => {
+    if (supabaseEnabled) {
+      const res = await cloudSignUp(username, email, password, joinPool);
+      if (res.error) { alert(res.error); return; }
+      if (res.needsConfirm) { alert('Te enviamos un correo para confirmar tu cuenta. Confírmalo y vuelve a iniciar sesión.'); return; }
+      setState(p => ({ ...p, currentUser: res.user!, view: 'playerSelect' }));
+      return;
+    }
     if (state.users.find(u => u.email === email)) { alert('Este correo ya está registrado.'); return; }
     const nu: User = { id: 'u' + Date.now(), username, email, password, playerId: null, poolJoined: !!joinPool, createdAt: new Date().toISOString() };
     setState(p => ({ ...p, users: [...p.users, nu], currentUser: nu, view: 'playerSelect' }));
   };
 
   const selectPlayer = (playerId: string) => {
+    if (supabaseEnabled && state.currentUser) cloudSetPlayer(state.currentUser.id, playerId);
     setState(p => ({
       ...p,
       currentUser: p.currentUser ? { ...p.currentUser, playerId } : null,
@@ -64,6 +107,7 @@ export default function App() {
 
   const placeBet = (matchId: string, home: number, away: number) => {
     const uid = state.currentUser!.id;
+    if (supabaseEnabled) cloudPlaceBet(uid, matchId, home, away);
     setState(p => ({
       ...p,
       bets: { ...p.bets, [uid]: { ...(p.bets[uid] || {}), [matchId]: { home, away, at: new Date().toISOString() } } },
@@ -71,21 +115,22 @@ export default function App() {
   };
 
   const updateResult = (matchId: string, home: number, away: number) => {
+    if (supabaseEnabled) cloudUpdateResult(matchId, home, away);
     setState(p => ({ ...p, matchResults: { ...p.matchResults, [matchId]: { home, away } } }));
   };
 
-  const logout = () => setState(p => ({ ...p, currentUser: null, view: 'auth', showAdmin: false }));
+  const logout = () => {
+    if (supabaseEnabled) cloudSignOut();
+    setState(p => ({ ...p, currentUser: null, view: 'auth', showAdmin: false }));
+  };
   const go = (view: View) => setState(p => ({ ...p, view }));
 
   // Compute current user's live point total
   const userTotalPoints = useMemo(() => {
     if (!state.currentUser) return 0;
     const ub = state.bets[state.currentUser.id] || {};
-    return matches.reduce((s, m) => {
-      if (m.status !== 'finished') return s;
-      const b = ub[m.id]; if (!b) return s;
-      return s + calculatePoints(b.home, b.away, m.homeScore!, m.awayScore!);
-    }, 0);
+    // 0–0 default applies: every finished match counts, even with no bet.
+    return matches.reduce((s, m) => s + pointsFor(ub[m.id], m), 0);
   }, [state.currentUser, state.bets, matches]);
 
   // ── Render ───────────────────────────────────────────────────────────

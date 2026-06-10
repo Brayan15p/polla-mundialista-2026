@@ -1,4 +1,4 @@
-import { PLAYERS, calculatePoints, type Match } from '../lib/data';
+import { PLAYERS, pointsFor, type Match } from '../lib/data';
 import type { User, Bet } from '../lib/state';
 import { AvatarBubble } from './Shared';
 
@@ -12,15 +12,16 @@ interface LeaderboardScreenProps {
 export function LeaderboardScreen({ users, bets, matches, currentUser }: LeaderboardScreenProps) {
   const rankings = [...users].map(u => {
     const ub = bets[u.id] || {};
-    let pts = 0, exact = 0, correct = 0, total = 0;
+    // Every finished match counts; missing bets play as the 0–0 default.
+    let pts = 0, exact = 0, correct = 0, total = 0, placed = 0;
     matches.forEach(m => {
       if (m.status !== 'finished') return;
-      const b = ub[m.id]; if (!b) return;
       total++;
-      const p = calculatePoints(b.home, b.away, m.homeScore!, m.awayScore!);
+      if (ub[m.id]) placed++;
+      const p = pointsFor(ub[m.id], m);
       pts += p; if (p === 3) exact++; if (p >= 1) correct++;
     });
-    return { ...u, pts, exact, correct, total };
+    return { ...u, pts, exact, correct, total, placed };
   }).sort((a, b) => b.pts - a.pts);
 
   const medals = ['#FFD700', '#C0C0C0', '#CD7F32'];
@@ -90,7 +91,7 @@ export function LeaderboardScreen({ users, bets, matches, currentUser }: Leaderb
                 {isMe && <span style={{ fontSize: 9, color: '#FFD700', letterSpacing: 1 }}>▸ TÚ</span>}
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow',sans-serif" }}>
-                {u.exact} exactos · {u.correct} acertados · {u.total} apostados
+                {u.exact} exactos · {u.correct} acertados · {u.placed}/{u.total} con apuesta
               </div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>

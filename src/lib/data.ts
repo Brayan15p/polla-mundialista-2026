@@ -200,6 +200,18 @@ export function calculatePoints(bH: number, bA: number, rH: number, rA: number):
   return bW === rW ? 1 : 0;
 }
 
+// Business rule: a registered player who does NOT place a bet on a match still
+// competes — they are entered automatically with a 0–0 default prediction.
+export const DEFAULT_BET = { home: 0, away: 0 } as const;
+
+// Points a player earns on a match, applying the 0–0 default for missing bets.
+// Returns 0 for matches that aren't finished yet.
+export function pointsFor(bet: { home: number; away: number } | undefined, m: Match): number {
+  if (m.status !== 'finished' || m.homeScore == null || m.awayScore == null) return 0;
+  const b = bet ?? DEFAULT_BET;
+  return calculatePoints(b.home, b.away, m.homeScore, m.awayScore);
+}
+
 export function canBet(matchDate: string, matchStatus: MatchStatus): boolean {
   if (matchStatus !== 'upcoming') return false;
   const deadline = new Date(matchDate).getTime() - 5 * 60 * 1000;

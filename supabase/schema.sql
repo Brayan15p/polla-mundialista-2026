@@ -69,6 +69,30 @@ create policy "results admin" on public.match_results for all
   with check (auth.uid() = '00000000-0000-0000-0000-000000000000');
 
 -- ============================================================================
+-- AUTO-PROFILE — create a profile row automatically when a user signs up.
+-- The client passes username + pool_joined as auth metadata; this trigger
+-- (running as the table owner) copies them in, so no client-side insert is
+-- needed and signup works even with email confirmation enabled.
+-- ============================================================================
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, username, pool_joined)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', 'Jugador'),
+    coalesce((new.raw_user_meta_data->>'pool_joined')::boolean, false)
+  )
+  on conflict (id) do nothing;
+  return new;
+end; $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ============================================================================
 -- REALTIME — so every device updates live when a bet or result changes.
 -- ============================================================================
 alter publication supabase_realtime add table public.bets;

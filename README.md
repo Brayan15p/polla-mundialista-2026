@@ -10,11 +10,13 @@ prototype, rebuilt as a real **Vite + React + TypeScript** application.
 - 👤 FIFA Ultimate Team–style player selection (14 players across legend/gold/silver/bronze tiers)
 - 📊 Dashboard with your points, live pool total, live match, and recent results
 - 📅 Matches & betting — 3 pts exact score · 1 pt correct winner · betting locks 5 min before kickoff
+- 🧮 No-bet rule: a registered player who skips a match still competes, entered automatically with a **0–0 default** prediction (`pointsFor` in `src/lib/data.ts`)
+- 🗺️ Fase Final view — countdown to the final, group tables (cuadrangulares), and the knockout bracket
 - 🏆 Real-time leaderboard with animated podium
 - 👤 Profile with personal stats + admin panel to enter real results
 
 Scoring and bet-locking rules live in `src/lib/data.ts`. State persists to
-`localStorage`.
+`localStorage` by default, or to **Supabase** when configured (see below).
 
 ## Getting started
 
@@ -46,6 +48,35 @@ To pull live results from [football-data.org](https://www.football-data.org):
 
 Any failure (no key, network error, empty response) falls back to mock data —
 see `src/lib/api.ts`.
+
+## Shared cloud play (optional · Supabase)
+
+Without configuration the app runs in **local demo mode** (one device,
+`localStorage`). To let everyone play from their own phone with a shared
+database, real accounts, live bets and live results:
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Open **SQL Editor → New query**, paste `supabase/schema.sql`, and **Run**.
+   This creates the `profiles`, `bets` and `match_results` tables with Row
+   Level Security, Realtime, and an auto-profile trigger. In the policy
+   `results admin`, replace the placeholder UUID with your own `auth.users` id
+   so only you can enter results.
+3. (Recommended for a casual pool) **Auth → Providers → Email**: turn **off**
+   "Confirm email" so sign-up logs players in immediately.
+4. **Settings → API**: copy the **Project URL** and the **publishable** (or
+   legacy **anon**) key into `.env`:
+
+   ```
+   VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+   VITE_SUPABASE_ANON_KEY=sb_publishable_…   # browser-safe key ONLY
+   ```
+
+   ⚠️ Never put the **secret / service_role / JWT** keys in the frontend or in
+   git — they bypass Row Level Security. Only the publishable/anon key is safe
+   in the browser, and only because RLS restricts it.
+
+5. `npm run dev`. The app now uses Supabase for auth, bets and results, and
+   every device updates live via Realtime. Logic lives in `src/lib/cloud.ts`.
 
 ## Deploy (Vercel)
 

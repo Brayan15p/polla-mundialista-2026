@@ -27,10 +27,17 @@ npm run build    # type-check + production build
 Quick demo login: use **"Acceso demo rápido"** on the auth screen
 (`demo@polla.com` / `demo123`).
 
-## Live match data (optional)
+## Match data & results
 
-By default the app ships with bundled World Cup 2026 mock data, so it works fully
-offline. To pull live data from [football-data.org](https://www.football-data.org):
+The app ships with the **complete group stage** — all 72 matches (12 groups × 6),
+generated from the group draw and listed **by date** (June 11–25, 2026). Every
+match starts as *upcoming* with **no score**: results are never fabricated. A
+score only appears once it comes from the live API or is entered in the admin
+panel. Points and the leaderboard recompute from real results only.
+
+### Live data (optional)
+
+To pull live results from [football-data.org](https://www.football-data.org):
 
 1. Register for a free API key.
 2. Copy `.env.example` to `.env` and set `VITE_FOOTBALL_API_KEY`.

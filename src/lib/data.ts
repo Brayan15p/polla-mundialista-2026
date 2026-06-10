@@ -108,32 +108,63 @@ export const PLAYERS: Player[] = [
   { id: 'muller', name: 'T. Müller', fullName: 'Thomas Müller', country: 'Germany', number: '13', kitA: '#DDDDDD', kitB: '#000000', role: 'Mediocampista', tier: 'bronze', silhouette: SILHOUETTE_MID },
 ];
 
-export const MATCHES: Match[] = [
-  { id: 'm001', group: 'A', home: 'Mexico', away: 'South Africa', date: '2026-06-12T18:00', venue: 'AT&T Stadium, Dallas', status: 'finished', homeScore: 2, awayScore: 1 },
-  { id: 'm002', group: 'A', home: 'Korea Republic', away: 'Czechia', date: '2026-06-12T21:00', venue: 'SoFi Stadium, Los Angeles', status: 'finished', homeScore: 1, awayScore: 1 },
-  { id: 'm003', group: 'B', home: 'Canada', away: 'Switzerland', date: '2026-06-13T15:00', venue: 'BC Place, Vancouver', status: 'finished', homeScore: 0, awayScore: 2 },
-  { id: 'm004', group: 'B', home: 'Bosnia and Herzegovina', away: 'Qatar', date: '2026-06-13T18:00', venue: 'Mercedes-Benz Stadium, Atlanta', status: 'finished', homeScore: 3, awayScore: 0 },
-  { id: 'm005', group: 'C', home: 'Brazil', away: 'Scotland', date: '2026-06-14T15:00', venue: 'MetLife Stadium, New York', status: 'finished', homeScore: 4, awayScore: 1 },
-  { id: 'm006', group: 'C', home: 'Morocco', away: 'Haiti', date: '2026-06-14T18:00', venue: 'Empower Field, Denver', status: 'finished', homeScore: 2, awayScore: 0 },
-  { id: 'm007', group: 'D', home: 'USA', away: 'Türkiye', date: '2026-06-15T15:00', venue: "Levi's Stadium, San Francisco", status: 'finished', homeScore: 1, awayScore: 0 },
-  { id: 'm008', group: 'D', home: 'Paraguay', away: 'Australia', date: '2026-06-15T18:00', venue: 'Estadio Azteca, Ciudad de México', status: 'finished', homeScore: 1, awayScore: 1 },
-  { id: 'm009', group: 'E', home: 'Germany', away: 'Ecuador', date: '2026-06-16T15:00', venue: 'Gillette Stadium, Boston', status: 'finished', homeScore: 2, awayScore: 0 },
-  { id: 'm010', group: 'E', home: 'Curaçao', away: "Côte d'Ivoire", date: '2026-06-16T18:00', venue: 'Arrowhead Stadium, Kansas City', status: 'finished', homeScore: 1, awayScore: 2 },
-  { id: 'm011', group: 'F', home: 'Netherlands', away: 'Tunisia', date: '2026-06-17T15:00', venue: 'Lincoln Financial Field, Phila.', status: 'finished', homeScore: 3, awayScore: 0 },
-  { id: 'm012', group: 'F', home: 'Japan', away: 'Sweden', date: '2026-06-17T18:00', venue: 'Rose Bowl, Los Angeles', status: 'finished', homeScore: 2, awayScore: 2 },
-  { id: 'm013', group: 'G', home: 'Belgium', away: 'New Zealand', date: '2026-06-18T15:00', venue: 'SoFi Stadium, Los Angeles', status: 'finished', homeScore: 3, awayScore: 1 },
-  { id: 'm014', group: 'G', home: 'Egypt', away: 'IR Iran', date: '2026-06-18T18:00', venue: 'AT&T Stadium, Dallas', status: 'finished', homeScore: 1, awayScore: 1 },
-  { id: 'm015', group: 'H', home: 'Spain', away: 'Uruguay', date: '2026-06-19T20:00', venue: 'Hard Rock Stadium, Miami', status: 'live', homeScore: 1, awayScore: 0, minute: 67 },
-  { id: 'm016', group: 'H', home: 'Cabo Verde', away: 'Saudi Arabia', date: '2026-06-19T23:00', venue: 'NRG Stadium, Houston', status: 'upcoming' },
-  { id: 'm017', group: 'I', home: 'France', away: 'Norway', date: '2026-06-20T15:00', venue: 'MetLife Stadium, New York', status: 'upcoming' },
-  { id: 'm018', group: 'I', home: 'Senegal', away: 'Iraq', date: '2026-06-20T18:00', venue: 'Empower Field, Denver', status: 'upcoming' },
-  { id: 'm019', group: 'J', home: 'Argentina', away: 'Jordan', date: '2026-06-21T15:00', venue: 'MetLife Stadium, New York', status: 'upcoming' },
-  { id: 'm020', group: 'J', home: 'Algeria', away: 'Austria', date: '2026-06-21T18:00', venue: 'AT&T Stadium, Dallas', status: 'upcoming' },
-  { id: 'm021', group: 'K', home: 'Portugal', away: 'Uzbekistan', date: '2026-06-22T15:00', venue: 'SoFi Stadium, Los Angeles', status: 'upcoming' },
-  { id: 'm022', group: 'K', home: 'Colombia', away: 'Congo DR', date: '2026-06-22T18:00', venue: 'Hard Rock Stadium, Miami', status: 'upcoming' },
-  { id: 'm023', group: 'L', home: 'England', away: 'Panama', date: '2026-06-23T15:00', venue: 'Gillette Stadium, Boston', status: 'upcoming' },
-  { id: 'm024', group: 'L', home: 'Croatia', away: 'Ghana', date: '2026-06-23T18:00', venue: 'Lincoln Financial Field, Phila.', status: 'upcoming' },
+// Host stadiums for the 2026 World Cup (rotated across the fixture).
+const HOST_VENUES = [
+  'Estadio Azteca, Ciudad de México',
+  'Estadio Akron, Guadalajara',
+  'Estadio BBVA, Monterrey',
+  'BC Place, Vancouver',
+  'BMO Field, Toronto',
+  'SoFi Stadium, Los Ángeles',
+  "Levi's Stadium, San Francisco",
+  'Lumen Field, Seattle',
+  'Arrowhead Stadium, Kansas City',
+  'AT&T Stadium, Dallas',
+  'NRG Stadium, Houston',
+  'Mercedes-Benz Stadium, Atlanta',
+  'Hard Rock Stadium, Miami',
+  'Gillette Stadium, Boston',
+  'MetLife Stadium, Nueva York',
+  'Lincoln Financial Field, Filadelfia',
 ];
+
+// Round-robin pairings (team indices) for each of a group's 3 matchdays.
+const ROUND_PAIRS: [number, number][][] = [
+  [[0, 1], [2, 3]], // Jornada 1
+  [[0, 2], [1, 3]], // Jornada 2
+  [[0, 3], [1, 2]], // Jornada 3
+];
+const MATCH_TIMES = ['13:00', '16:00', '19:00'];
+
+// Build the complete group-stage fixture: 12 groups × 6 matches = 72 games.
+// Every match ships as `upcoming` with NO score — real results come only from
+// the live API (football-data.org) or the admin panel. We never fabricate
+// scores for games that haven't been played.
+function buildGroupStage(): Match[] {
+  const out: Match[] = [];
+  let venueIdx = 0;
+  Object.entries(GROUPS).forEach(([gKey, g], gIdx) => {
+    ROUND_PAIRS.forEach((pairs, round) => {
+      pairs.forEach((pair, p) => {
+        const day = 11 + round * 5 + (gIdx % 5); // June 11–25, 2026
+        const time = MATCH_TIMES[(gIdx + p) % MATCH_TIMES.length];
+        out.push({
+          id: `${gKey}${round * 2 + p + 1}`,
+          group: gKey,
+          home: g.teams[pair[0]],
+          away: g.teams[pair[1]],
+          date: `2026-06-${String(day).padStart(2, '0')}T${time}`,
+          venue: HOST_VENUES[venueIdx++ % HOST_VENUES.length],
+          status: 'upcoming',
+        });
+      });
+    });
+  });
+  // Chronological so the "by date" listing reads naturally.
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export const MATCHES: Match[] = buildGroupStage();
 
 export function calculatePoints(bH: number, bA: number, rH: number, rA: number): number {
   if (bH === rH && bA === rA) return 3;

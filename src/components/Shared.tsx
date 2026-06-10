@@ -101,6 +101,7 @@ export function NavBar({ user, view, onNavigate, onLogout, userPoints }: NavBarP
   const navItems: { key: View; label: string; icon: string }[] = [
     { key: 'dashboard', label: 'INICIO', icon: '⚽' },
     { key: 'matches', label: 'PARTIDOS', icon: '📅' },
+    { key: 'bracket', label: 'FASES', icon: '🗺️' },
     { key: 'leaderboard', label: 'TABLA', icon: '🏆' },
     { key: 'profile', label: 'PERFIL', icon: '👤' },
   ];

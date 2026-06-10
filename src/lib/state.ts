@@ -18,7 +18,7 @@ export interface Bet {
   at?: string;
 }
 
-export type View = 'auth' | 'playerSelect' | 'dashboard' | 'matches' | 'leaderboard' | 'profile';
+export type View = 'auth' | 'playerSelect' | 'dashboard' | 'matches' | 'bracket' | 'leaderboard' | 'profile';
 
 export interface AppState {
   users: User[];

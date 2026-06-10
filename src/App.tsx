@@ -8,6 +8,7 @@ import { PlayerSelectScreen } from './components/PlayerSelect';
 import { BgLayer, NavBar } from './components/Shared';
 import { DashboardScreen } from './components/Dashboard';
 import { MatchesScreen } from './components/Matches';
+import { BracketScreen } from './components/Bracket';
 import { LeaderboardScreen } from './components/Leaderboard';
 import { ProfileScreen } from './components/Profile';
 import { AdminScreen } from './components/Admin';
@@ -107,6 +108,7 @@ export default function App() {
 
       {view === 'dashboard' && <DashboardScreen user={currentUser} users={users} bets={bets} matches={matches} onNavigate={go} />}
       {view === 'matches' && <MatchesScreen user={currentUser} users={users} bets={bets} matches={matches} onBet={placeBet} />}
+      {view === 'bracket' && <BracketScreen matches={matches} />}
       {view === 'leaderboard' && <LeaderboardScreen users={users} bets={bets} matches={matches} currentUser={currentUser} />}
       {view === 'profile' && (
         <ProfileScreen

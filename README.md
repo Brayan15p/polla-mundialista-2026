@@ -1,25 +1,68 @@
-# CODING AGENTS: READ THIS FIRST
+# Polla Mundialista 2026
 
-This is a **handoff bundle** from Claude Design (claude.ai/design).
+World Cup 2026 betting-pool app — a faithful implementation of the Claude Design
+prototype, rebuilt as a real **Vite + React + TypeScript** application.
 
-A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
+## Features
 
-## What you should do — IMPORTANT
+- 🎬 Cinematic animated intro (gold particles, floating trophy, host-nation flags)
+- 🔐 Login / registration with optional entry into the general pool ($100,000 COP)
+- 👤 FIFA Ultimate Team–style player selection (14 players across legend/gold/silver/bronze tiers)
+- 📊 Dashboard with your points, live pool total, live match, and recent results
+- 📅 Matches & betting — 3 pts exact score · 1 pt correct winner · betting locks 5 min before kickoff
+- 🏆 Real-time leaderboard with animated podium
+- 👤 Profile with personal stats + admin panel to enter real results
 
-**Read the chat transcripts first.** There are 1 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
+Scoring and bet-locking rules live in `src/lib/data.ts`. State persists to
+`localStorage`.
 
-**Find the primary design file under `project/` and read it top to bottom.** The chat transcripts will tell you which file the user was last iterating on. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
+## Getting started
 
-**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # type-check + production build
+```
 
-## About the design files
+Quick demo login: use **"Acceso demo rápido"** on the auth screen
+(`demo@polla.com` / `demo123`).
 
-The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+## Live match data (optional)
 
-**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
+By default the app ships with bundled World Cup 2026 mock data, so it works fully
+offline. To pull live data from [football-data.org](https://www.football-data.org):
 
-## Bundle contents
+1. Register for a free API key.
+2. Copy `.env.example` to `.env` and set `VITE_FOOTBALL_API_KEY`.
+3. `npm run dev`. The Vite dev server proxies `/football → api.football-data.org`
+   to avoid CORS. A green **● DATOS EN VIVO** badge appears when live data loads.
 
-- `README.md` — this file
-- `chats/` — conversation transcripts (read these!)
-- `project/` — the `POLLA MUNDIALISTA  2026` project files (HTML prototypes, assets, components)
+Any failure (no key, network error, empty response) falls back to mock data —
+see `src/lib/api.ts`.
+
+## Deploy (Vercel)
+
+The app lives at the **repository root**, so Vercel auto-detects it as a Vite
+project — no "Root Directory" setting needed.
+
+1. Import the repo at [vercel.com](https://vercel.com) → New Project.
+2. Framework is detected as **Vite** (build `npm run build`, output `dist/`,
+   defined in `vercel.json`).
+3. Optional: add `VITE_FOOTBALL_API_KEY` under Settings → Environment Variables
+   for live data. (Note: `VITE_*` vars are bundled into the public client.)
+4. Deploy. Every push to `main` redeploys automatically.
+
+## Project structure
+
+```
+index.html, vite.config.ts, package.json   # Vite app at root
+src/
+  lib/
+    data.ts      # teams, flags, groups, players, matches, scoring rules
+    state.ts     # app state shape, defaults, localStorage persistence
+    api.ts       # live data fetch + mock fallback
+  components/     # Intro, Auth, PlayerSelect, Dashboard, Matches, Leaderboard, Profile, Admin, Shared, Particles
+  App.tsx         # root state + routing
+public/uploads/   # trophy + groups images
+design/           # original Claude Design handoff bundle (prototype + chat transcripts)
+```

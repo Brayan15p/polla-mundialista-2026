@@ -14,7 +14,7 @@ import { AdminScreen } from './components/Admin';
 
 export default function App() {
   const [state, setState] = useState<AppState>(loadState);
-  const [showIntro, setShowIntro] = useState(() => localStorage.getItem('pollaWC2026_intro') !== 'done');
+  const [showIntro, setShowIntro] = useState(true);
   const [baseMatches, setBaseMatches] = useState<Match[]>([]);
   const [dataSource, setDataSource] = useState<'live' | 'mock'>('mock');
 
@@ -38,10 +38,7 @@ export default function App() {
   }), [baseMatches, state.matchResults]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
-  const introComplete = () => {
-    setShowIntro(false);
-    localStorage.setItem('pollaWC2026_intro', 'done');
-  };
+  const introComplete = () => { setShowIntro(false); };
 
   const login = (email: string, password: string) => {
     const u = state.users.find(u => u.email === email && u.password === password);
@@ -109,7 +106,7 @@ export default function App() {
       )}
 
       {view === 'dashboard' && <DashboardScreen user={currentUser} users={users} bets={bets} matches={matches} onNavigate={go} />}
-      {view === 'matches' && <MatchesScreen user={currentUser} bets={bets} matches={matches} onBet={placeBet} />}
+      {view === 'matches' && <MatchesScreen user={currentUser} users={users} bets={bets} matches={matches} onBet={placeBet} />}
       {view === 'leaderboard' && <LeaderboardScreen users={users} bets={bets} matches={matches} currentUser={currentUser} />}
       {view === 'profile' && (
         <ProfileScreen

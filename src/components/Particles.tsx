@@ -50,6 +50,57 @@ export function Particles({ count = 200, footballs = true }: { count?: number; f
   return <canvas ref={ref} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }} />;
 }
 
+export function GoldBurst() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    const w = (canvas.width = window.innerWidth);
+    const h = (canvas.height = window.innerHeight);
+    const GOLDS = ['#FFD700', '#FFE566', '#C9A62C', '#FFF3B0', '#FFAA00', '#FFC200'];
+    const ox = w / 2, oy = h * 0.72;
+    const pieces = Array.from({ length: 90 }, () => {
+      const angle = (Math.random() - 0.5) * Math.PI * 1.5 - Math.PI / 2;
+      const spd = 7 + Math.random() * 17;
+      return {
+        x: ox + (Math.random() - 0.5) * 80, y: oy,
+        vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
+        g: 0.48, a: 1, decay: 0.012 + Math.random() * 0.009,
+        size: 3 + Math.random() * 9,
+        color: GOLDS[Math.floor(Math.random() * GOLDS.length)],
+        rot: Math.random() * Math.PI * 2, rotV: (Math.random() - 0.5) * 0.3,
+        circle: Math.random() > 0.5,
+      };
+    });
+    let raf = 0;
+    const tick = () => {
+      ctx.clearRect(0, 0, w, h);
+      let alive = 0;
+      for (const p of pieces) {
+        p.vy += p.g; p.x += p.vx; p.y += p.vy;
+        p.rot += p.rotV; p.a -= p.decay;
+        if (p.a <= 0) continue; alive++;
+        ctx.save();
+        ctx.globalAlpha = p.a; ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color; ctx.shadowBlur = p.size * 3;
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        if (p.circle) {
+          ctx.beginPath(); ctx.arc(0, 0, p.size * 0.65, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size * 0.3, p.size, p.size * 0.6);
+        }
+        ctx.restore();
+      }
+      if (alive > 0) raf = requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, w, h);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return <canvas ref={ref} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 }} />;
+}
+
 export function Confetti({ active }: { active: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {

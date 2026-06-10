@@ -68,6 +68,14 @@ input:focus { border-color: rgba(255,215,0,0.5) !important; }
   0%   { top: 0%; }
   100% { top: 100%; }
 }
+@keyframes wc-lockPulse {
+  0%, 100% { border-color: rgba(239,68,68,0.22); }
+  50% { border-color: rgba(239,68,68,0.65); box-shadow: 0 0 18px rgba(239,68,68,0.12); }
+}
+@keyframes wc-goldShine {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
 [data-view] { animation: wc-fadeIn 0.3s ease; }
 @keyframes wc-bounceIn {
   0%   { transform: scale(0.6); opacity: 0; }

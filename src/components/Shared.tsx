@@ -1,5 +1,21 @@
+import { useState } from 'react';
 import { FLAGS, PLAYERS, type Player, type Match } from '../lib/data';
 import type { User, View } from '../lib/state';
+
+const COUNTRY_CODES: Record<string, string> = {
+  'Mexico': 'mx', 'South Africa': 'za', 'Korea Republic': 'kr', 'Czechia': 'cz',
+  'Canada': 'ca', 'Bosnia and Herzegovina': 'ba', 'Qatar': 'qa', 'Switzerland': 'ch',
+  'Brazil': 'br', 'Morocco': 'ma', 'Haiti': 'ht', 'Scotland': 'gb-sct',
+  'USA': 'us', 'Paraguay': 'py', 'Australia': 'au', 'Türkiye': 'tr',
+  'Germany': 'de', 'Curaçao': 'cw', "Côte d'Ivoire": 'ci', 'Ecuador': 'ec',
+  'Netherlands': 'nl', 'Japan': 'jp', 'Sweden': 'se', 'Tunisia': 'tn',
+  'Belgium': 'be', 'Egypt': 'eg', 'IR Iran': 'ir', 'New Zealand': 'nz',
+  'Spain': 'es', 'Cabo Verde': 'cv', 'Saudi Arabia': 'sa', 'Uruguay': 'uy',
+  'France': 'fr', 'Senegal': 'sn', 'Iraq': 'iq', 'Norway': 'no',
+  'Argentina': 'ar', 'Algeria': 'dz', 'Austria': 'at', 'Jordan': 'jo',
+  'Portugal': 'pt', 'Congo DR': 'cd', 'Uzbekistan': 'uz', 'Colombia': 'co',
+  'England': 'gb-eng', 'Croatia': 'hr', 'Ghana': 'gh', 'Panama': 'pa',
+};
 
 export function BgLayer() {
   return (
@@ -44,16 +60,30 @@ export function AvatarBubble({ player, size = 40 }: { player?: Player | null; si
 }
 
 export function FlagBadge({ country, size = 52 }: { country: string; size?: number }) {
+  const code = COUNTRY_CODES[country];
+  const [failed, setFailed] = useState(false);
+  const w = size + 16;
+  const h = Math.round(w * 0.67);
   return (
     <div style={{
-      width: size + 12, height: size + 12, borderRadius: 14,
+      width: w, height: h, borderRadius: 10,
       background: 'rgba(255,255,255,0.05)',
-      border: '1px solid rgba(255,255,255,0.1)',
+      border: '1px solid rgba(255,255,255,0.13)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size, lineHeight: 1,
-      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+      overflow: 'hidden',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+      flexShrink: 0,
     }}>
-      {FLAGS[country] || '🏴'}
+      {code && !failed ? (
+        <img
+          src={`https://flagcdn.com/w80/${code}.png`}
+          alt={country}
+          onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <span style={{ fontSize: size * 0.6, lineHeight: 1 }}>{FLAGS[country] || '🏴'}</span>
+      )}
     </div>
   );
 }

@@ -166,6 +166,33 @@ function buildGroupStage(): Match[] {
 
 export const MATCHES: Match[] = buildGroupStage();
 
+export const TEAM_STRENGTH: Record<string, number> = {
+  'France': 90, 'Brazil': 89, 'Argentina': 88, 'England': 88,
+  'Spain': 87, 'Germany': 85, 'Portugal': 84, 'Netherlands': 83,
+  'Belgium': 80, 'Norway': 74, 'USA': 75, 'Canada': 72, 'Mexico': 73,
+  'Colombia': 71, 'Japan': 70, 'Morocco': 68, 'Uruguay': 68,
+  'Senegal': 67, 'Switzerland': 66, 'Croatia': 65, 'Korea Republic': 63,
+  'Sweden': 64, 'Ecuador': 62, 'Australia': 62, 'Türkiye': 61,
+  "Côte d'Ivoire": 58, 'Czechia': 59, 'Scotland': 59, 'Algeria': 58,
+  'Austria': 57, 'Egypt': 56, 'Saudi Arabia': 56, 'Tunisia': 54,
+  'IR Iran': 54, 'Bosnia and Herzegovina': 54, 'Paraguay': 53,
+  'Ghana': 53, 'Uzbekistan': 52, 'Congo DR': 52, 'South Africa': 50,
+  'Iraq': 48, 'Panama': 48, 'Cabo Verde': 47, 'Qatar': 46,
+  'Jordan': 46, 'New Zealand': 45, 'Curaçao': 40, 'Haiti': 40,
+};
+
+export function winProbability(home: string, away: string): { home: number; draw: number; away: number } {
+  const sh = TEAM_STRENGTH[home] ?? 55;
+  const sa = TEAM_STRENGTH[away] ?? 55;
+  const diff = Math.abs(sh - sa) / Math.max(sh, sa);
+  const drawP = Math.max(0.10, 0.28 - diff * 0.22);
+  const remainder = 1 - drawP;
+  const homeShare = (sh * 1.05) / (sh * 1.05 + sa);
+  const h = Math.round(remainder * homeShare * 100);
+  const d = Math.round(drawP * 100);
+  return { home: h, draw: d, away: 100 - h - d };
+}
+
 export function calculatePoints(bH: number, bA: number, rH: number, rA: number): number {
   if (bH === rH && bA === rA) return 3;
   const bW = bH > bA ? 'H' : bH < bA ? 'A' : 'D';

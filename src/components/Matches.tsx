@@ -1,20 +1,27 @@
 import { useState, useEffect, type CSSProperties } from 'react';
-import { GROUPS, calculatePoints, canBet, winProbability, type Match } from '../lib/data';
+import { GROUPS, canBet, winProbability, pointsFor, type Match } from '../lib/data';
 import type { User, Bet } from '../lib/state';
 import { FlagBadge } from './Shared';
 import { GoldBurst } from './Particles';
 
-interface OtherBet { username: string; bet: Bet; }
+// One participant's prediction + outcome on a match.
+interface Participant {
+  username: string;
+  home: number;
+  away: number;
+  isDefault: boolean;     // true = auto 0–0 (player placed no bet)
+  points: number | null;  // null while the match isn't finished
+}
 
 interface MatchBetCardProps {
   match: Match;
   bet?: Bet;
   canBetNow: boolean;
   onBet: (home: number, away: number) => void;
-  otherBets?: OtherBet[];
+  participants?: Participant[];
 }
 
-export function MatchBetCard({ match, bet, canBetNow, onBet, otherBets }: MatchBetCardProps) {
+export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: MatchBetCardProps) {
   const [homeVal, setHomeVal] = useState(bet != null ? String(bet.home) : '');
   const [awayVal, setAwayVal] = useState(bet != null ? String(bet.away) : '');
   const [editing, setEditing] = useState(!bet && match.status === 'upcoming' && canBetNow);
@@ -39,7 +46,8 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, otherBets }: MatchB
     setTimeout(() => setSaved(false), 2800);
   };
 
-  const pts = isDone && bet != null ? calculatePoints(bet.home, bet.away, match.homeScore!, match.awayScore!) : null;
+  // Includes the 0–0 default rule, so you see your result even without a bet.
+  const pts = isDone ? pointsFor(bet, match) : null;
   const ptsColor = pts === 3 ? '#22C55E' : pts === 1 ? '#FFD700' : '#6B7280';
 
   const numInp: CSSProperties = {
@@ -194,39 +202,51 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, otherBets }: MatchB
           </div>
         )}
 
-        {/* Who bet — revealed once betting is locked */}
-        {!canBetNow && otherBets && otherBets.length > 0 && (
+        {/* Who bet / who won — revealed once betting is locked */}
+        {!canBetNow && participants && participants.length > 0 && (
           <div style={{ marginTop: 10 }}>
             <button onClick={() => setShowBets(s => !s)} style={{
               width: '100%', padding: '9px 14px',
               background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 10, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              color: 'rgba(255,255,255,0.4)',
-              fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1,
+              color: isDone ? '#FFD700' : 'rgba(255,255,255,0.4)',
+              fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700,
             }}>
-              <span>👥 {otherBets.length} {otherBets.length === 1 ? 'apuesta' : 'apuestas'} de otros jugadores</span>
+              <span>{isDone
+                ? `🏆 QUIÉN ACERTÓ · ${participants.filter(p => (p.points ?? 0) > 0).length} con puntos`
+                : `👥 ${participants.length} ${participants.length === 1 ? 'apuesta' : 'apuestas'} de otros jugadores`}</span>
               <span style={{ transition: 'transform 0.2s', transform: showBets ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▾</span>
             </button>
             {showBets && (
-              <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 6 }}>
-                {otherBets.map(ob => (
-                  <div key={ob.username} style={{
-                    padding: '8px 12px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontFamily: "'Barlow',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '55%' }}>{ob.username}</span>
-                    <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 18, color: '#FFD700', letterSpacing: 1, flexShrink: 0 }}>{ob.bet.home}–{ob.bet.away}</span>
-                  </div>
-                ))}
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {participants.map(p => {
+                  const c = p.points === 3 ? '#22C55E' : p.points === 1 ? '#FFD700' : 'rgba(255,255,255,0.3)';
+                  return (
+                    <div key={p.username} style={{
+                      padding: '9px 12px', borderRadius: 10,
+                      background: p.points === 3 ? 'rgba(34,197,94,0.08)' : p.points === 1 ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${p.points === 3 ? 'rgba(34,197,94,0.25)' : p.points === 1 ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.07)'}`,
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,0.6)', fontFamily: "'Barlow',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.points === 3 && '👑 '}{p.username}
+                        {p.isDefault && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}> · por defecto</span>}
+                      </span>
+                      <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 17, color: '#FFD700', letterSpacing: 1, flexShrink: 0 }}>{p.home}–{p.away}</span>
+                      {p.points !== null && (
+                        <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 16, color: c, flexShrink: 0, minWidth: 28, textAlign: 'right' }}>+{p.points}</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* Points result */}
-        {pts !== null && bet != null && (
+        {/* Points result (your own — includes 0–0 default if you didn't bet) */}
+        {pts !== null && (
           <div style={{
             marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '10px 14px', borderRadius: 10,
@@ -238,7 +258,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, otherBets }: MatchB
                 {pts === 3 ? '🎯 ¡Marcador exacto!' : pts === 1 ? '✅ Acertaste el ganador' : '❌ Sin puntos'}
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                Tu apuesta: {bet.home}–{bet.away} · Real: {match.homeScore}–{match.awayScore}
+                Tu apuesta: {bet != null ? `${bet.home}–${bet.away}` : '0–0 (por defecto)'} · Real: {match.homeScore}–{match.awayScore}
               </div>
             </div>
             <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 32, color: ptsColor, lineHeight: 1 }}>+{pts}</div>
@@ -355,15 +375,28 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
               </div>
 
               {dayMatches.map(m => {
-                const notBettable = !canBet(m.date, m.status);
-                const otherBets: OtherBet[] = notBettable
-                  ? users.filter(u => u.id !== user.id && bets[u.id]?.[m.id]).map(u => ({ username: u.username, bet: bets[u.id][m.id] }))
-                  : [];
+                const locked = !canBet(m.date, m.status);
+                let participants: Participant[] = [];
+                if (m.status === 'finished') {
+                  // Everyone is scored — players with no bet play the 0–0 default.
+                  participants = users
+                    .filter(u => u.id !== user.id)
+                    .map(u => {
+                      const b = bets[u.id]?.[m.id];
+                      return { username: u.username, home: b?.home ?? 0, away: b?.away ?? 0, isDefault: !b, points: pointsFor(b, m) };
+                    })
+                    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || a.username.localeCompare(b.username));
+                } else if (locked) {
+                  // Betting closed but not played yet — show who actually bet.
+                  participants = users
+                    .filter(u => u.id !== user.id && bets[u.id]?.[m.id])
+                    .map(u => ({ username: u.username, home: bets[u.id][m.id].home, away: bets[u.id][m.id].away, isDefault: false, points: null }));
+                }
                 return (
                   <MatchBetCard key={m.id} match={m} bet={userBets[m.id]}
-                    canBetNow={canBet(m.date, m.status)}
+                    canBetNow={!locked}
                     onBet={(h, a) => onBet(m.id, h, a)}
-                    otherBets={otherBets}
+                    participants={participants}
                   />
                 );
               })}

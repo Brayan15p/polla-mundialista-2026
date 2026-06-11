@@ -7,12 +7,12 @@ describe('calculatePoints', () => {
     expect(calculatePoints(2, 1, 2, 1)).toBe(3);
     expect(calculatePoints(0, 0, 0, 0)).toBe(3);
   });
-  it('gives 1 for the right winner but wrong score', () => {
-    expect(calculatePoints(2, 0, 3, 1)).toBe(1); // home win predicted, home win real
-    expect(calculatePoints(0, 2, 1, 3)).toBe(1); // away win
+  it('gives 0 for the right winner but wrong score (marcador mode has no partial credit)', () => {
+    expect(calculatePoints(2, 0, 3, 1)).toBe(0); // home win predicted, home win real — but wrong score
+    expect(calculatePoints(0, 2, 1, 3)).toBe(0); // away win — wrong score
   });
-  it('gives 1 for a correctly predicted draw', () => {
-    expect(calculatePoints(1, 1, 2, 2)).toBe(1);
+  it('gives 0 for a correctly predicted draw with wrong score', () => {
+    expect(calculatePoints(1, 1, 2, 2)).toBe(0);
   });
   it('gives 0 when the result is wrong', () => {
     expect(calculatePoints(2, 0, 0, 2)).toBe(0);
@@ -27,9 +27,9 @@ const finished = (h: number, a: number): Match => ({
 
 describe('pointsFor — 0-0 default rule', () => {
   it('scores a missing bet as 0-0', () => {
-    expect(pointsFor(undefined, finished(0, 0))).toBe(3);   // default 0-0 hits an actual 0-0
-    expect(pointsFor(undefined, finished(0, 2))).toBe(0);   // 0-0 predicts a draw; 0-2 is an away win → 0 pts
-    expect(pointsFor(undefined, finished(1, 1))).toBe(1);   // 0-0 predicts a draw; 1-1 is a draw → 1 pt
+    expect(pointsFor(undefined, finished(0, 0))).toBe(3);   // default 0-0 hits an actual 0-0 → 3 pts
+    expect(pointsFor(undefined, finished(0, 2))).toBe(0);   // 0-0 vs 0-2: wrong score → 0 pts
+    expect(pointsFor(undefined, finished(1, 1))).toBe(0);   // 0-0 vs 1-1: wrong score (no partial credit) → 0 pts
   });
   it('a real bet beats the default', () => {
     expect(pointsFor({ home: 2, away: 1 }, finished(2, 1))).toBe(3);

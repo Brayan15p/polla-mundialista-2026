@@ -110,8 +110,6 @@ scored as (
         case when b.pick = outcome_of(f.home, f.away) then 1 else 0 end
       when coalesce(b.home, 0) = f.home
        and coalesce(b.away, 0) = f.away then 3
-      when outcome_of(coalesce(b.home, 0)::smallint, coalesce(b.away, 0)::smallint)
-         = outcome_of(f.home, f.away) then 1
       else 0
     end as points
   from public.profiles p
@@ -143,7 +141,6 @@ select
     when coalesce(b.kind, 'score') = 'winner' then
       case when b.pick = outcome_of(mr.home, mr.away) then 1 else 0 end
     when b.home = mr.home and b.away = mr.away then 3
-    when outcome_of(b.home::smallint, b.away::smallint) = outcome_of(mr.home, mr.away) then 1
     else 0
   end as points
 from public.bets b

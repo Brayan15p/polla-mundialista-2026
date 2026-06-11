@@ -345,8 +345,8 @@ export function outcomeOf(h: number, a: number): Outcome {
 }
 
 export function calculatePoints(bH: number, bA: number, rH: number, rA: number): number {
-  if (bH === rH && bA === rA) return 3; // marcador exacto → 3 pts
-  return 0; // modalidad marcador: sin punto parcial por acertar ganador
+  if (bH === rH && bA === rA) return 3;
+  return outcomeOf(bH, bA) === outcomeOf(rH, rA) ? 1 : 0;
 }
 
 // A bet is either an exact-score guess or a winner-only (1X2) guess.

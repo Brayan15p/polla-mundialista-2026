@@ -290,8 +290,8 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
           </div>
         )}
 
-        {/* Participants panel: shown when match is locked (≤5 min) or finished */}
-        {!canBetNow && participants && participants.length > 0 && (
+        {/* Participants panel: always visible when teams are known */}
+        {participants && participants.length > 0 && (
           <div style={{ marginTop: 10 }}>
             {isDone ? (
               /* ── FINISHED: Full winner table, auto-expanded ── */
@@ -340,7 +340,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                 </div>
               </div>
             ) : (
-              /* ── LOCKED (not finished): show who bet vs who hasn't, hide exact values ── */
+              /* ── OPEN / LOCKED (not finished): show who bet vs who hasn't, hide exact values ── */
               <div>
                 <button onClick={() => setShowBets(s => !s)} style={{
                   width: '100%', padding: '9px 14px',
@@ -351,7 +351,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                   fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700,
                 }}>
                   <span>
-                    👥 {participants.filter(p => p.hasBet).length}/{participants.length} apostaron
+                    👥 {participants.filter(p => p.hasBet).length}/{participants.length} {canBetNow ? 'van apostando' : 'apostaron'}
                     {participants.some(p => !p.hasBet) && (
                       <span style={{ color: 'rgba(255,100,100,0.7)', marginLeft: 6 }}>
                         · {participants.filter(p => !p.hasBet).length} sin apostar
@@ -374,7 +374,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                           {p.username}{p.isMe ? ' (tú)' : ''}
                         </span>
                         <span style={{ fontSize: 11, color: p.hasBet ? 'rgba(34,197,94,0.7)' : 'rgba(255,80,80,0.6)', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1 }}>
-                          {p.hasBet ? 'APOSTÓ 🔒' : 'SIN APOSTAR'}
+                          {p.hasBet ? (canBetNow ? '✅ APOSTÓ' : 'APOSTÓ 🔒') : 'SIN APOSTAR'}
                         </span>
                       </div>
                     ))}
@@ -529,11 +529,11 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
 
               {dayMatches.map(m => {
                 const bettable = canBet(m.date, m.status) && teamsKnown(m);
-                const locked = !bettable && teamsKnown(m);
                 let participants: Participant[] = [];
 
-                if (locked || m.status === 'finished') {
-                  // Show ALL registered users: who bet, who didn't, who won.
+                // Always show the participant list when teams are known —
+                // even while betting is open (hides exact values until locked).
+                if (teamsKnown(m)) {
                   participants = users.map(u => {
                     const b = bets[u.id]?.[m.id];
                     return {
@@ -550,11 +550,9 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
                   });
 
                   if (m.status === 'finished') {
-                    // Winners first, then by points, then alpha
                     participants.sort((a, b) =>
                       (b.points ?? 0) - (a.points ?? 0) || a.username.localeCompare(b.username));
                   } else {
-                    // Those who bet come before those who haven't
                     participants.sort((a, b) =>
                       (a.hasBet ? 0 : 1) - (b.hasBet ? 0 : 1) || a.username.localeCompare(b.username));
                   }

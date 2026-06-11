@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { FLAGS, type Match } from '../lib/data';
+import { cloudDiagnose } from '../lib/cloud';
 
 interface AdminScreenProps {
   matches: Match[];
@@ -14,6 +15,8 @@ export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches }:
   );
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [syncMsg, setSyncMsg] = useState('');
+  const [diagLines, setDiagLines] = useState<string[] | null>(null);
+  const [diagRunning, setDiagRunning] = useState(false);
 
   const sync = async () => {
     if (!onSyncMatches) return;
@@ -56,6 +59,24 @@ export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches }:
             {syncMsg && <span style={{ marginLeft: 12, fontSize: 12, color: 'rgba(255,255,255,0.7)', fontFamily: "'Barlow',sans-serif" }}>{syncMsg}</span>}
           </div>
         )}
+        {/* Diagnostics panel */}
+        <div style={{ marginBottom: 20, padding: '14px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 14 }}>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13, color: '#3B82F6', letterSpacing: 1 }}>🔍 DIAGNÓSTICO DE LA NUBE</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: "'Barlow',sans-serif", margin: '4px 0 10px', lineHeight: 1.5 }}>
+            Verifica que Supabase esté bien configurado: auth, tablas, permisos de lectura/escritura.
+          </div>
+          <button onClick={async () => { setDiagRunning(true); setDiagLines(await cloudDiagnose()); setDiagRunning(false); }} disabled={diagRunning} style={{
+            padding: '10px 18px', background: diagRunning ? '#555' : 'linear-gradient(135deg,#60A5FA,#3B82F6)', border: 'none',
+            borderRadius: 10, color: '#fff', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+            fontSize: 13, letterSpacing: 1, cursor: diagRunning ? 'wait' : 'pointer',
+          }}>{diagRunning ? '⏳ VERIFICANDO…' : '🔍 EJECUTAR DIAGNÓSTICO'}</button>
+          {diagLines && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(0,0,0,0.4)', borderRadius: 10, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.8, color: '#E2E8F0', whiteSpace: 'pre-wrap' }}>
+              {diagLines.map((l, i) => <div key={i}>{l}</div>)}
+            </div>
+          )}
+        </div>
+
         {matches.map(m => {
           const v = vals[m.id] || { home: '', away: '' };
           const inpS: CSSProperties = { width: 52, height: 48, textAlign: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 8, color: '#FFD700', fontFamily: "'Anton',sans-serif", fontSize: 26, outline: 'none' };

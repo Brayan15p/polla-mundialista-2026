@@ -176,6 +176,11 @@ export async function cloudLoadAll(): Promise<CloudData> {
     supabase.from('match_results').select('match_id, home, away'),
   ]);
 
+  // Surface any read errors to the console so they're visible when debugging.
+  if (profilesRes.error) console.error('[cloud] profiles read error:', profilesRes.error.message);
+  if (betsRes.error) console.error('[cloud] bets read error:', betsRes.error.message);
+  if (resultsRes.error) console.error('[cloud] results read error:', resultsRes.error.message);
+
   const users = (profilesRes.data as ProfileRow[] | null)?.map(toUser) ?? [];
 
   const bets: CloudData['bets'] = {};
@@ -193,6 +198,68 @@ export async function cloudLoadAll(): Promise<CloudData> {
   }
 
   return { users, bets, matchResults };
+}
+
+// ── Diagnostics ────────────────────────────────────────────────────────
+// Run a suite of checks and return a plain report the admin can read.
+export async function cloudDiagnose(): Promise<string[]> {
+  const lines: string[] = [];
+  if (!supabase) { lines.push('❌ Supabase NO configurado (faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)'); return lines; }
+  lines.push('✅ Cliente Supabase creado');
+
+  // 1. Auth — who is logged in?
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) lines.push(`❌ Auth: ${error.message}`);
+    else if (!user) lines.push('⚠️ No hay sesión activa (no estás logueado en la nube)');
+    else lines.push(`✅ Sesión activa: ${user.email} (id: ${user.id})`);
+  } catch (e) { lines.push(`❌ Auth fetch falló: ${(e as Error).message}`); }
+
+  // 2. Profiles table
+  const { data: profiles, error: pErr } = await supabase.from('profiles').select('id, username').limit(5);
+  if (pErr) lines.push(`❌ Leer profiles: ${pErr.message}`);
+  else lines.push(`✅ Profiles: ${profiles?.length ?? 0} usuario(s) encontrados`);
+
+  // 3. Bets table — check columns exist
+  const { data: bets, error: bErr } = await supabase.from('bets').select('user_id, match_id, home, away, kind, pick').limit(5);
+  if (bErr) {
+    lines.push(`❌ Leer bets: ${bErr.message}`);
+    if (/kind|pick/i.test(bErr.message)) lines.push('   → Falta ejecutar migration_bet_kind.sql (o re-correr schema.sql)');
+  } else {
+    lines.push(`✅ Bets: ${bets?.length ?? 0} apuesta(s) en la DB (columns kind/pick OK)`);
+  }
+
+  // 4. Write test — try to insert and immediately delete a canary bet
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const testId = '__diag_test__';
+      const { error: wErr } = await supabase.from('bets').upsert(
+        { user_id: user.id, match_id: testId, home: 0, away: 0, kind: 'score', pick: null },
+        { onConflict: 'user_id,match_id' },
+      );
+      if (wErr) {
+        lines.push(`❌ Escribir bets: ${wErr.message}`);
+        if (/no sincronizado|sincroniza/i.test(wErr.message)) lines.push('   → El trigger anti-fraude bloquea: sincroniza los partidos desde Admin');
+      } else {
+        lines.push('✅ Escritura bets: OK');
+        await supabase.from('bets').delete().eq('user_id', user.id).eq('match_id', testId);
+      }
+    }
+  } catch (e) { lines.push(`❌ Write test exception: ${(e as Error).message}`); }
+
+  // 5. Match results table
+  const { error: rErr } = await supabase.from('match_results').select('match_id').limit(1);
+  if (rErr) lines.push(`❌ Leer match_results: ${rErr.message}`);
+  else lines.push('✅ match_results: OK');
+
+  // 6. Matches table (anti-fraud kickoffs)
+  const { data: mData, error: mErr } = await supabase.from('matches').select('id').limit(1);
+  if (mErr) lines.push(`⚠️ Tabla matches (anti-fraud): ${mErr.message}`);
+  else if (!mData || mData.length === 0) lines.push('⚠️ Tabla matches vacía — anti-fraude no bloqueará, pero las apuestas sí guardarán');
+  else lines.push('✅ Tabla matches con datos (anti-fraude activo)');
+
+  return lines;
 }
 
 // ── Realtime ────────────────────────────────────────────────────────────

@@ -8,6 +8,21 @@
 
 import { MATCHES, FLAGS, type Match, type MatchStatus } from './data';
 
+// Map API team names → names used in our fixture/FLAGS table
+const NAME_MAP: Record<string, string> = {
+  'South Korea': 'Korea Republic',
+  'Korea Republic': 'Korea Republic',
+  'Iran': 'IR Iran',
+  "Ivory Coast": "Côte d'Ivoire",
+  "Côte d'Ivoire": "Côte d'Ivoire",
+  'Congo': 'Congo DR',
+  'DR Congo': 'Congo DR',
+  'Cape Verde': 'Cabo Verde',
+  'Turkey': 'Türkiye',
+  'Curacao': 'Curaçao',
+  'Bosnia & Herzegovina': 'Bosnia and Herzegovina',
+};
+
 const API_KEY = import.meta.env.VITE_FOOTBALL_API_KEY;
 // Same-origin proxy path → forward to https://api.football-data.org/v4
 const API_BASE = '/football/v4';
@@ -34,27 +49,32 @@ export function mapStatus(s: string): MatchStatus {
   return 'upcoming';
 }
 
-// Normalize team names so they match our FLAGS / GROUPS keys when possible.
+// Normalize team names so they match our FLAGS / GROUPS keys.
 function teamName(t: RawTeam): string {
   const raw = t.name || t.shortName || t.tla || '';
-  return Object.prototype.hasOwnProperty.call(FLAGS, raw) ? raw : raw;
+  return NAME_MAP[raw] ?? (Object.prototype.hasOwnProperty.call(FLAGS, raw) ? raw : raw);
 }
 
 export function mapMatch(m: RawMatch, idx: number): Match {
   const ft = m.score?.fullTime;
   const group = (m.group || '').replace(/^GROUP_/i, '').trim() || '?';
+  const home = teamName(m.homeTeam);
+  const away = teamName(m.awayTeam);
   // IMPORTANT: keep the full UTC timestamp (with its trailing `Z`). The kickoff
   // is shown in Colombia time downstream via fmtTime → America/Bogota. Stripping
   // the zone here used to make toInstant treat the UTC hour AS Colombia time,
   // shifting every API kickoff 5 hours. Preserve the zone and let the formatter
   // convert it correctly.
+  const date = m.utcDate || `2026-06-12T${String(12 + (idx % 8)).padStart(2, '0')}:00-05:00`;
+  // Use venue from our bundled fixture (API doesn't return stadium names).
+  const fixtureMatch = MATCHES.find(f => f.home === home && f.away === away);
   return {
     id: 'api-' + m.id,
     group,
-    home: teamName(m.homeTeam),
-    away: teamName(m.awayTeam),
-    date: m.utcDate || `2026-06-12T${String(12 + (idx % 8)).padStart(2, '0')}:00-05:00`,
-    venue: 'TBD',
+    home,
+    away,
+    date,
+    venue: fixtureMatch?.venue || 'TBD',
     status: mapStatus(m.status),
     homeScore: ft?.home ?? undefined,
     awayScore: ft?.away ?? undefined,

@@ -378,7 +378,7 @@ export function pointsFor(bet: BetLike | undefined, m: Match): number {
 
 // Match times are stored as Colombia local time (UTC−5). Build the real instant
 // so the deadline and the displayed time are correct on any device.
-function toInstant(iso: string): Date {
+export function toInstant(iso: string): Date {
   // 'YYYY-MM-DDTHH:MM' → append seconds + Colombia offset if no zone is present.
   const hasZone = /[Zz]|[+-]\d\d:?\d\d$/.test(iso);
   return new Date(hasZone ? iso : `${iso.length <= 16 ? iso + ':00' : iso}-05:00`);

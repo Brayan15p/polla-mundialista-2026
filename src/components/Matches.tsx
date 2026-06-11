@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties } from 'react';
-import { GROUPS, canBet, winProbability, pointsFor, teamsKnown, fmtTime, type Match, type BetKind, type Outcome } from '../lib/data';
+import { GROUPS, canBet, winProbability, pointsFor, teamsKnown, fmtTime, toInstant, type Match, type BetKind, type Outcome } from '../lib/data';
 import type { User, Bet } from '../lib/state';
 import { FlagBadge } from './Shared';
 import { GoldBurst } from './Particles';
@@ -340,20 +340,24 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
   //  · FINALES     → by knockout stage (32avos, Octavos, …)
   //  · TODOS       → by calendar day (badge with the date)
   interface Section { key: string; title: string; sub: string; day?: string; matches: Match[] }
+  // Always use Colombia timezone so UTC dates from the live API land on the
+  // correct local day (e.g. 21:00 COL = 02:00 next day UTC).
+  const colDate = (iso: string) =>
+    toInstant(iso).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }); // YYYY-MM-DD
   const fmtDay = (iso: string) =>
-    new Date(iso.split('T')[0] + 'T12:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+    toInstant(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' });
 
   const isGroupTab = activeGroup !== 'all' && activeGroup !== 'KO';
   let sections: Section[];
   if (isGroupTab) {
-    // Group by matchday using actual dates (not IDs) — FIFA sometimes
-    // schedules pairings out of the standard 1-2-3 order (e.g. Group E).
+    // Group by matchday using actual Colombia dates — FIFA sometimes schedules
+    // pairings out of the standard 1-2-3 order (e.g. Group E).
     const byDay: Record<string, Match[]> = {};
-    filtered.forEach(m => { const d = m.date.split('T')[0]; (byDay[d] ??= []).push(m); });
+    filtered.forEach(m => { const d = colDate(m.date); (byDay[d] ??= []).push(m); });
     const days = Object.keys(byDay).sort();
     sections = days.map((d, i) => ({
       key: `J${i + 1}`, title: `JORNADA ${i + 1}`,
-      sub: fmtDay(d + 'T12:00'),
+      sub: fmtDay(d + 'T12:00:00-05:00'),
       matches: byDay[d].sort((a, b) => a.date.localeCompare(b.date)),
     }));
   } else if (activeGroup === 'KO') {
@@ -371,7 +375,7 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
     }).sort((a, b) => a.matches[0].date.localeCompare(b.matches[0].date));
   } else {
     const byDay = filtered.reduce<Record<string, Match[]>>((acc, m) => {
-      const day = m.date.split('T')[0];
+      const day = colDate(m.date);
       (acc[day] ??= []).push(m); return acc;
     }, {});
     sections = Object.entries(byDay).map(([day, ms]) => ({ key: day, title: '', sub: '', day, matches: ms }));
@@ -415,7 +419,7 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
           const dayMatches = sec.matches;
           const betCount = dayMatches.filter(m => userBets[m.id]).length;
           const allBet = betCount === dayMatches.length;
-          const date = sec.day ? new Date(sec.day + 'T12:00') : null;
+          const date = sec.day ? new Date(sec.day + 'T12:00:00-05:00') : null;
 
           return (
             <div key={sec.key} style={{ marginBottom: 36 }}>

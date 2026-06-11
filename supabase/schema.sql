@@ -24,6 +24,21 @@ create table if not exists public.bets (
   primary key (user_id, match_id)
 );
 
+-- Two bet types (exact score vs. winner-only). Kept here too — and idempotent —
+-- so simply re-running schema.sql is enough to make betting work; you don't have
+-- to also remember migration_bet_kind.sql. Without these columns the bet write
+-- fails and nothing saves to the cloud.
+alter table public.bets
+  add column if not exists kind text not null default 'score',
+  add column if not exists pick text;
+alter table public.bets drop constraint if exists bets_kind_chk;
+alter table public.bets add constraint bets_kind_chk check (kind in ('score', 'winner'));
+alter table public.bets drop constraint if exists bets_pick_chk;
+alter table public.bets add constraint bets_pick_chk check (
+  (kind = 'winner' and pick in ('H', 'D', 'A')) or
+  (kind = 'score'  and pick is null)
+);
+
 -- 3) MATCH_RESULTS — real final scores, written only by an admin.
 create table if not exists public.match_results (
   match_id   text primary key,

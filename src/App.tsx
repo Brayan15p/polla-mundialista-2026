@@ -37,6 +37,8 @@ export default function App() {
   const [pendingTutorial, setPendingTutorial] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [celebratePoints, setCelebratePoints] = useState<number | null>(null);
+  // Surfaced when a cloud bet write fails, so it's never silent again.
+  const [betError, setBetError] = useState<string | null>(null);
 
   // Load match data (live API with mock fallback)
   useEffect(() => {
@@ -150,14 +152,29 @@ export default function App() {
     if (pendingTutorial) { setShowTutorial(true); setPendingTutorial(false); }
   };
 
-  const placeBet = (matchId: string, payload: { home: number; away: number; kind: BetKind; pick?: Outcome }) => {
+  const placeBet = async (matchId: string, payload: { home: number; away: number; kind: BetKind; pick?: Outcome }) => {
     const uid = state.currentUser!.id;
     const bet = { ...payload, at: new Date().toISOString() };
-    if (supabaseEnabled) cloudPlaceBet(uid, matchId, bet);
+    const prev = state.bets[uid]?.[matchId];
+    // Optimistic: show it immediately…
     setState(p => ({
       ...p,
       bets: { ...p.bets, [uid]: { ...(p.bets[uid] || {}), [matchId]: bet } },
     }));
+    if (!supabaseEnabled) return;
+    // …then confirm it actually persisted. If not, roll back and say why, so a
+    // bet that didn't reach the database never looks like it was saved.
+    const { error } = await cloudPlaceBet(uid, matchId, bet);
+    if (error) {
+      setState(p => {
+        const ub = { ...(p.bets[uid] || {}) };
+        if (prev) ub[matchId] = prev; else delete ub[matchId];
+        return { ...p, bets: { ...p.bets, [uid]: ub } };
+      });
+      setBetError(error);
+    } else {
+      setBetError(null);
+    }
   };
 
   const updateResult = (matchId: string, home: number, away: number) => {
@@ -217,6 +234,21 @@ export default function App() {
 
       {dataSource === 'live' && (
         <div style={{ position: 'fixed', top: 70, right: 12, zIndex: 150, fontSize: 9, letterSpacing: 1, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 4, padding: '2px 8px', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700 }}>● DATOS EN VIVO</div>
+      )}
+
+      {betError && (
+        <div onClick={() => setBetError(null)} style={{
+          position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 300,
+          maxWidth: 440, width: 'calc(100% - 24px)', cursor: 'pointer',
+          background: 'rgba(239,68,68,0.14)', border: '1px solid rgba(239,68,68,0.45)',
+          borderRadius: 12, padding: '12px 16px', color: '#FCA5A5',
+          fontFamily: "'Barlow',sans-serif", fontSize: 13, lineHeight: 1.4,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+        }}>
+          <div style={{ fontWeight: 700, color: '#EF4444', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1, marginBottom: 2 }}>⚠️ TU APUESTA NO SE GUARDÓ</div>
+          {betError}
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Toca para cerrar</div>
+        </div>
       )}
 
       {view === 'dashboard' && <DashboardScreen user={currentUser} users={users} bets={bets} matches={matches} onNavigate={go} />}

@@ -133,11 +133,20 @@ export async function cloudSetPlayer(userId: string, playerId: string): Promise<
 export async function cloudPlaceBet(
   userId: string, matchId: string,
   bet: { home: number; away: number; kind?: string; pick?: string },
-): Promise<void> {
-  await supabase?.from('bets').upsert(
+): Promise<{ error?: string }> {
+  if (!supabase) return { error: 'Supabase no configurado' };
+  const { error } = await supabase.from('bets').upsert(
     { user_id: userId, match_id: matchId, home: bet.home, away: bet.away, kind: bet.kind ?? 'score', pick: bet.pick ?? null },
     { onConflict: 'user_id,match_id' },
   );
+  if (!error) return {};
+  // Turn the raw Postgres/PostgREST error into something the player can act on.
+  const msg = error.message || '';
+  if (/column .*(kind|pick).* does not exist|'kind'|'pick'/i.test(msg))
+    return { error: 'Falta una actualización de la base de datos. El admin debe ejecutar supabase/migration_bet_kind.sql en Supabase.' };
+  if (/no sincronizado|sincroniza/i.test(msg))
+    return { error: 'Este partido no está sincronizado. El admin debe abrir el panel y presionar “Sincronizar partidos”.' };
+  return { error: msg || 'No se pudo guardar la apuesta.' };
 }
 
 export async function cloudUpdateResult(matchId: string, home: number, away: number): Promise<void> {

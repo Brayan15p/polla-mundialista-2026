@@ -2,12 +2,9 @@
 -- Migrates bets from api-* match IDs to stable IDs (A1, B2, KO-R16-1, etc.)
 -- and removes duplicate api-* rows from the matches table.
 
--- Bypass triggers for this session (needed because some matches already started)
--- session_replication_role = replica disables all triggers at session level.
--- Resets automatically when session ends.
-SET session_replication_role = replica;
-
-BEGIN;
+-- Drop the deadline trigger so it doesn't block migration of already-started matches.
+-- It is recreated at the end, identical to before.
+DROP TRIGGER IF EXISTS bets_deadline ON public.bets;
 
 -- Step 0: Normalize team names in api-* match rows
 UPDATE public.matches SET home_team = 'Bosnia and Herzegovina' WHERE home_team = 'Bosnia-Herzegovina';
@@ -27,7 +24,7 @@ UPDATE public.matches SET away_team = 'Curaçao'                WHERE away_team 
 UPDATE public.matches SET home_team = E'Côte d''Ivoire'        WHERE home_team = 'Ivory Coast';
 UPDATE public.matches SET away_team = E'Côte d''Ivoire'        WHERE away_team = 'Ivory Coast';
 
--- Step 1: Build mapping table: api-* id → stable id (matched by teams)
+-- Step 1: Build mapping: api-* id → stable id
 DROP TABLE IF EXISTS _id_map;
 CREATE TEMP TABLE _id_map AS
 SELECT
@@ -40,7 +37,7 @@ JOIN public.matches m_stable
   AND m_stable.id NOT LIKE 'api-%'
 WHERE m_api.id LIKE 'api-%';
 
--- Step 2: For users with BOTH api-* and stable bet: copy values from whichever is newer
+-- Step 2: For users with BOTH bets: copy values from the more recent one to the stable row
 UPDATE public.bets sb
 SET
   home       = ab.home,
@@ -62,7 +59,7 @@ WHERE ab.match_id  = im.api_id
   AND sb.user_id   = ab.user_id
   AND sb.match_id  = im.stable_id;
 
--- Step 4: Migrate remaining api-* bets to stable ID
+-- Step 4: Migrate remaining api-* bets → stable ID
 UPDATE public.bets b
 SET match_id = im.stable_id
 FROM _id_map im
@@ -71,10 +68,10 @@ WHERE b.match_id = im.api_id;
 -- Step 5: Delete api-* rows from matches
 DELETE FROM public.matches WHERE id LIKE 'api-%';
 
-COMMIT;
-
--- Reset triggers back to normal
-SET session_replication_role = DEFAULT;
+-- Recreate the deadline trigger exactly as before
+CREATE TRIGGER bets_deadline
+  BEFORE INSERT OR UPDATE ON public.bets
+  FOR EACH ROW EXECUTE FUNCTION public.check_bet_deadline();
 
 -- Verification — must show 0, 0
 SELECT 'api-bets remaining'    AS check, COUNT(*) AS n FROM public.bets    WHERE match_id LIKE 'api-%'

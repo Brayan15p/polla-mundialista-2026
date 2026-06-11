@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { pointsFor, type Match, type BetKind, type Outcome } from './lib/data';
 import { fetchMatches } from './lib/api';
-import { loadState, saveState, type AppState, type User, type View } from './lib/state';
+import { loadState, saveState, isAdmin, type AppState, type User, type View } from './lib/state';
 import { supabaseEnabled } from './lib/supabase';
 import {
   cloudSignIn, cloudSignUp, cloudSignOut, cloudCurrentUser, cloudLoadAll,
@@ -197,7 +197,9 @@ export default function App() {
 
   if (!currentUser) return <AuthScreen onLogin={login} onRegister={register} onForgotPassword={supabaseEnabled ? cloudSendPasswordReset : undefined} />;
   if (!currentUser.playerId) return <PlayerSelectScreen onSelect={selectPlayer} />;
-  if (showAdmin) return (
+  // Admin panel is gated to super users only — never trust a stale showAdmin flag.
+  const admin = isAdmin(currentUser);
+  if (showAdmin && admin) return (
     <AdminScreen
       matches={matches}
       onClose={() => setState(p => ({ ...p, showAdmin: false }))}
@@ -226,6 +228,7 @@ export default function App() {
         <ProfileScreen
           user={currentUser} users={users} bets={bets} matches={matches}
           onChangePlayer={selectPlayer} onLogout={logout}
+          isAdmin={admin}
           onShowAdmin={() => setState(p => ({ ...p, showAdmin: true }))}
         />
       )}

@@ -15,7 +15,7 @@ const API_BASE = '/football/v4';
 const COMPETITION = 'WC';
 
 interface RawTeam { name?: string; shortName?: string; tla?: string }
-interface RawMatch {
+export interface RawMatch {
   id: number;
   stage?: string;
   group?: string | null;
@@ -28,7 +28,7 @@ interface RawMatch {
 }
 
 // Map football-data.org status → our MatchStatus
-function mapStatus(s: string): MatchStatus {
+export function mapStatus(s: string): MatchStatus {
   if (s === 'IN_PLAY' || s === 'PAUSED') return 'live';
   if (s === 'FINISHED' || s === 'AWARDED') return 'finished';
   return 'upcoming';
@@ -40,15 +40,20 @@ function teamName(t: RawTeam): string {
   return Object.prototype.hasOwnProperty.call(FLAGS, raw) ? raw : raw;
 }
 
-function mapMatch(m: RawMatch, idx: number): Match {
+export function mapMatch(m: RawMatch, idx: number): Match {
   const ft = m.score?.fullTime;
   const group = (m.group || '').replace(/^GROUP_/i, '').trim() || '?';
+  // IMPORTANT: keep the full UTC timestamp (with its trailing `Z`). The kickoff
+  // is shown in Colombia time downstream via fmtTime → America/Bogota. Stripping
+  // the zone here used to make toInstant treat the UTC hour AS Colombia time,
+  // shifting every API kickoff 5 hours. Preserve the zone and let the formatter
+  // convert it correctly.
   return {
     id: 'api-' + m.id,
     group,
     home: teamName(m.homeTeam),
     away: teamName(m.awayTeam),
-    date: m.utcDate?.slice(0, 16) || `2026-06-12T${String(12 + (idx % 8)).padStart(2, '0')}:00`,
+    date: m.utcDate || `2026-06-12T${String(12 + (idx % 8)).padStart(2, '0')}:00-05:00`,
     venue: 'TBD',
     status: mapStatus(m.status),
     homeScore: ft?.home ?? undefined,

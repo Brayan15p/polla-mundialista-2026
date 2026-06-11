@@ -11,10 +11,11 @@ interface ProfileScreenProps {
   matches: Match[];
   onChangePlayer: (playerId: string) => void;
   onLogout: () => void;
+  isAdmin?: boolean;
   onShowAdmin: () => void;
 }
 
-export function ProfileScreen({ user, users, bets, matches, onChangePlayer, onLogout, onShowAdmin }: ProfileScreenProps) {
+export function ProfileScreen({ user, users, bets, matches, onChangePlayer, onLogout, isAdmin, onShowAdmin }: ProfileScreenProps) {
   const [showSel, setShowSel] = useState(false);
   const player = PLAYERS.find(p => p.id === user.playerId);
   const ub = bets[user.id] || {};
@@ -99,11 +100,13 @@ export function ProfileScreen({ user, users, bets, matches, onChangePlayer, onLo
 
       {/* Actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <button onClick={onShowAdmin} style={{
-          padding: '14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 12, color: 'rgba(255,255,255,0.6)',
-          fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: 'pointer',
-        }}>⚙️ PANEL DE ADMINISTRADOR</button>
+        {isAdmin && (
+          <button onClick={onShowAdmin} style={{
+            padding: '14px', background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.3)',
+            borderRadius: 12, color: '#FFD700',
+            fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: 'pointer',
+          }}>⚙️ PANEL DE ADMINISTRADOR · SUPER USUARIO</button>
+        )}
         <button onClick={onLogout} style={{
           padding: '14px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)',
           borderRadius: 12, color: '#EF4444',

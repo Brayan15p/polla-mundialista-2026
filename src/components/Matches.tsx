@@ -6,6 +6,33 @@ import { GoldBurst } from './Particles';
 
 export interface BetPayload { home: number; away: number; kind: BetKind; pick?: Outcome }
 
+// Seconds remaining until kickoff (negative = already started).
+function useKickoffCountdown(matchDate: string, status: string): number {
+  const kickoffMs = toInstant(matchDate).getTime();
+  const [secs, setSecs] = useState(() => Math.floor((kickoffMs - Date.now()) / 1000));
+  useEffect(() => {
+    if (status !== 'upcoming') return;
+    const secsLeft = Math.floor((kickoffMs - Date.now()) / 1000);
+    // Only tick if within 25 hours — no point running for far-future matches.
+    if (secsLeft > 25 * 3600) return;
+    setSecs(secsLeft);
+    const t = setInterval(() => setSecs(Math.floor((kickoffMs - Date.now()) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [kickoffMs, status]);
+  return secs;
+}
+
+// Format seconds into a readable countdown string.
+function fmtCountdown(secs: number): string {
+  if (secs <= 0) return '¡YA EMPEZÓ!';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
+}
+
 // One participant's prediction + outcome on a match.
 interface Participant {
   username: string;
@@ -40,6 +67,14 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
   const [saved, setSaved] = useState(false);
   const [burstKey, setBurstKey] = useState(0);
   const [showBets, setShowBets] = useState(false);
+
+  const secsLeft = useKickoffCountdown(match.date, match.status);
+  // Show countdown when upcoming, teams known, and within 24h
+  const showCountdown = match.status === 'upcoming' && teamsKnown(match) && secsLeft < 24 * 3600;
+  const DEADLINE_SECS = 5 * 60;
+  const countdownUrgent = secsLeft > 0 && secsLeft <= DEADLINE_SECS;
+  const countdownWarning = secsLeft > DEADLINE_SECS && secsLeft <= 60 * 60; // < 1h
+  const countdownColor = countdownUrgent ? '#EF4444' : countdownWarning ? '#FFD700' : '#22C55E';
 
   useEffect(() => {
     if (bet != null) {
@@ -102,6 +137,17 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
             {isLive && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#EF4444', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444', display: 'inline-block', animation: 'wc-livePulse 1s infinite' }} />{match.minute}'
+              </span>
+            )}
+            {showCountdown && (
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 4, fontSize: 11,
+                color: countdownColor, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+                background: `rgba(${countdownUrgent ? '239,68,68' : countdownWarning ? '255,215,0' : '34,197,94'},0.1)`,
+                border: `1px solid ${countdownColor}44`, borderRadius: 5, padding: '2px 7px',
+                animation: countdownUrgent ? 'wc-livePulse 1s infinite' : 'none',
+              }}>
+                ⏱ {fmtCountdown(secsLeft)}
               </span>
             )}
           </div>

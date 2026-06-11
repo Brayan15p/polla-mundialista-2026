@@ -81,6 +81,16 @@ export default function App() {
     });
   }, [state.currentUser, baseMatches]);
 
+  // Auto-sync results every 5 minutes while admin has the app open.
+  // More reliable than GitHub Actions cron for free tier repos.
+  useEffect(() => {
+    if (!supabaseEnabled || !state.currentUser || !isAdmin(state.currentUser)) return;
+    const run = () => fetch('/api/sync-results').catch(() => {});
+    run();
+    const id = setInterval(run, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [state.currentUser]);
+
   // Open the "set new password" screen when the user arrives from a recovery email.
   useEffect(() => {
     if (!supabaseEnabled) return;

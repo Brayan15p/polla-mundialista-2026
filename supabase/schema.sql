@@ -109,9 +109,25 @@ create trigger on_auth_user_created
 
 -- ============================================================================
 -- REALTIME — so every device updates live when a bet or result changes.
+-- Safe to re-run: only adds the table if it isn't already in the publication.
 -- ============================================================================
-alter publication supabase_realtime add table public.bets;
-alter publication supabase_realtime add table public.match_results;
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'bets'
+  ) then
+    alter publication supabase_realtime add table public.bets;
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'match_results'
+  ) then
+    alter publication supabase_realtime add table public.match_results;
+  end if;
+end $$;
 
 -- Keep updated_at fresh on bet changes.
 create or replace function public.touch_updated_at()

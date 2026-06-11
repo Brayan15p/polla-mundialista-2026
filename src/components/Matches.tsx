@@ -351,20 +351,35 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                     EN JUEGO · apuestas reveladas
                   </span>
                 </div>
+                {/* My bet highlighted */}
+                {bet && (
+                  <div style={{
+                    padding: '10px 14px', borderRadius: 10, marginBottom: 8,
+                    background: 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(201,166,44,0.05))',
+                    border: '1px solid rgba(255,215,0,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, letterSpacing: 2, color: 'rgba(255,215,0,0.7)' }}>TU APUESTA</span>
+                    <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, color: '#FFD700', letterSpacing: 2 }}>
+                      {bet.kind === 'winner'
+                        ? (bet.pick === 'H' ? `Gana ${match.home}` : bet.pick === 'A' ? `Gana ${match.away}` : 'Empate')
+                        : `${bet.home} – ${bet.away}`}
+                    </span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {participants.map(p => (
                     <div key={p.username} style={{
                       padding: '8px 12px', borderRadius: 10,
-                      background: p.hasBet ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${p.hasBet ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                      background: p.isMe ? 'rgba(255,215,0,0.06)' : p.hasBet ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${p.isMe ? 'rgba(255,215,0,0.3)' : p.hasBet ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}`,
                       display: 'flex', alignItems: 'center', gap: 8,
-                      outline: p.isMe ? '1px solid rgba(239,68,68,0.5)' : 'none',
                     }}>
                       <span style={{ fontSize: 12 }}>{p.hasBet ? '⚽' : '⏳'}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontFamily: "'Barlow',sans-serif", fontSize: 12, color: p.isMe ? '#fff' : 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: p.isMe ? 700 : 400 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontFamily: "'Barlow',sans-serif", fontSize: 12, color: p.isMe ? '#FFD700' : 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: p.isMe ? 700 : 400 }}>
                         {p.username}{p.isMe ? ' (tú)' : ''}
                       </span>
-                      <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 15, color: p.hasBet ? '#FFD700' : 'rgba(255,255,255,0.2)', letterSpacing: 1, flexShrink: 0 }}>
+                      <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 15, color: p.hasBet ? (p.isMe ? '#FFD700' : 'rgba(255,255,255,0.7)') : 'rgba(255,255,255,0.2)', letterSpacing: 1, flexShrink: 0 }}>
                         {p.hasBet ? (p.kind === 'winner' ? (p.pick === 'H' ? `Gana ${match.home}` : p.pick === 'A' ? `Gana ${match.away}` : 'Empate') : `${p.home}–${p.away}`) : 'no apostó'}
                       </span>
                     </div>

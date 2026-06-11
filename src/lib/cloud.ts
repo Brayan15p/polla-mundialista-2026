@@ -44,7 +44,7 @@ export async function cloudSignUp(
   });
   if (error) return { error: error.message };
   if (!data.session) return { needsConfirm: true }; // email confirmation is ON
-  const profile = await fetchProfile(data.user!.id);
+  const profile = await ensureProfile(data.user, username, joinPool);
   return { user: profile ?? { id: data.user!.id, username, email: '', password: '', playerId: null, poolJoined: joinPool, createdAt: new Date().toISOString() } };
 }
 
@@ -54,8 +54,9 @@ export async function cloudSignIn(
   if (!supabase) return { error: 'Supabase no configurado' };
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: error.message };
-  const profile = await fetchProfile(data.user!.id);
-  return { user: profile ?? undefined };
+  const profile = await ensureProfile(data.user);
+  if (!profile) return { error: 'No se pudo cargar tu perfil. Verifica que ejecutaste schema.sql en Supabase.' };
+  return { user: profile };
 }
 
 export async function cloudSignOut(): Promise<void> {
@@ -67,13 +68,37 @@ export async function cloudCurrentUser(): Promise<User | null> {
   if (!supabase) return null;
   const { data } = await supabase.auth.getUser();
   if (!data.user) return null;
-  return (await fetchProfile(data.user.id)) ?? null;
+  return await ensureProfile(data.user);
 }
 
 async function fetchProfile(id: string): Promise<User | null> {
   if (!supabase) return null;
   const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
   return data ? toUser(data as ProfileRow) : null;
+}
+
+// Return the player's profile, creating it on the fly if it's missing — this
+// keeps login working even if the auto-profile trigger wasn't installed or the
+// account was created before schema.sql was applied.
+async function ensureProfile(
+  authUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined,
+  username?: string, poolJoined?: boolean,
+): Promise<User | null> {
+  if (!supabase || !authUser) return null;
+  const existing = await fetchProfile(authUser.id);
+  if (existing) return existing;
+
+  const meta = authUser.user_metadata || {};
+  const name = username || (meta.username as string) || authUser.email?.split('@')[0] || 'Jugador';
+  const pool = poolJoined ?? Boolean(meta.pool_joined);
+  const { data } = await supabase
+    .from('profiles')
+    .insert({ id: authUser.id, username: name, pool_joined: pool })
+    .select('*')
+    .maybeSingle();
+  if (data) return toUser(data as ProfileRow);
+  // Insert may have raced with the trigger — read once more.
+  return await fetchProfile(authUser.id);
 }
 
 // ── Writes ──────────────────────────────────────────────────────────────

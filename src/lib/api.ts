@@ -21,6 +21,7 @@ const NAME_MAP: Record<string, string> = {
   'Turkey': 'Türkiye',
   'Curacao': 'Curaçao',
   'Bosnia & Herzegovina': 'Bosnia and Herzegovina',
+  'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
 };
 
 const API_KEY = import.meta.env.VITE_FOOTBALL_API_KEY;

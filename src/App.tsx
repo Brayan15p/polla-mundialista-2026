@@ -73,10 +73,21 @@ export default function App() {
   // ── Handlers ─────────────────────────────────────────────────────────
   const introComplete = () => { setShowIntro(false); };
 
+  // Turn raw auth errors into clear Spanish guidance.
+  const friendlyError = (err?: string): string => {
+    const e = (err || '').toLowerCase();
+    if (/failed to fetch|networkerror|load failed|fetch event/.test(e))
+      return 'No se pudo conectar con el servidor.\n\nRevisa:\n• Tu conexión a internet.\n• Que la URL de Supabase esté bien escrita (https://tu-proyecto.supabase.co, sin barra final ni espacios).\n• Que en Vercel hayas vuelto a desplegar (Redeploy) después de agregar las variables.';
+    if (/invalid login credentials/.test(e)) return 'Correo o contraseña incorrectos.';
+    if (/email not confirmed/.test(e)) return 'Tu correo aún no está confirmado. Revisa tu bandeja de entrada (o desactiva la confirmación en Supabase).';
+    if (/user already registered/.test(e)) return 'Ese correo ya está registrado. Inicia sesión.';
+    return err || 'Ocurrió un error. Inténtalo de nuevo.';
+  };
+
   const login = async (email: string, password: string) => {
     if (supabaseEnabled) {
       const res = await cloudSignIn(email, password);
-      if (res.error || !res.user) { alert(res.error || 'No se pudo iniciar sesión.'); return; }
+      if (res.error || !res.user) { alert(friendlyError(res.error) || 'No se pudo iniciar sesión.'); return; }
       setState(p => ({ ...p, currentUser: res.user!, view: res.user!.playerId ? 'dashboard' : 'playerSelect' }));
       return;
     }
@@ -88,7 +99,7 @@ export default function App() {
   const register = async ({ username, email, password, joinPool }: RegisterPayload) => {
     if (supabaseEnabled) {
       const res = await cloudSignUp(username, email, password, joinPool);
-      if (res.error) { alert(res.error); return; }
+      if (res.error) { alert(friendlyError(res.error)); return; }
       if (res.needsConfirm) { alert('Te enviamos un correo para confirmar tu cuenta. Confírmalo y vuelve a iniciar sesión.'); return; }
       setPendingTutorial(true);
       setState(p => ({ ...p, currentUser: res.user!, view: 'playerSelect' }));

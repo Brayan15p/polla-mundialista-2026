@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { pointsFor, type Match, type BetKind, type Outcome } from './lib/data';
 import { fetchMatches } from './lib/api';
 import { loadState, saveState, isAdmin, type AppState, type User, type View } from './lib/state';
@@ -67,6 +67,19 @@ export default function App() {
     const unsub = cloudSubscribe(refresh);
     return () => { active = false; unsub(); };
   }, []);
+
+  // Auto-sync kickoff times whenever a super user logs in, so the server-side
+  // betting lock stays current without anyone pressing "Sincronizar partidos".
+  const autoSynced = useRef(false);
+  useEffect(() => {
+    if (!supabaseEnabled || autoSynced.current || baseMatches.length === 0) return;
+    if (!state.currentUser || !isAdmin(state.currentUser)) return;
+    autoSynced.current = true;
+    cloudSyncMatches(baseMatches).then(r => {
+      if (r.error) console.warn('[cloud] auto-sync de partidos falló:', r.error);
+      else console.info('[cloud] horarios de partidos sincronizados automáticamente');
+    });
+  }, [state.currentUser, baseMatches]);
 
   // Open the "set new password" screen when the user arrives from a recovery email.
   useEffect(() => {

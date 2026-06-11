@@ -60,7 +60,23 @@ begin
   return new;
 end; $$;
 
--- 4) Verificación final: muestra el estado para confirmar que todo quedó bien.
+-- 4) PERMISOS DE ADMIN POR CORREO — las políticas originales usaban un uuid
+--    de relleno (0000…), así que NADIE podía escribir resultados ni sincronizar
+--    horarios. Ahora el super usuario se identifica por su correo de sesión.
+drop policy if exists "results admin" on public.match_results;
+create policy "results admin" on public.match_results for all
+  using      ((auth.jwt() ->> 'email') = 'apedrazacespedes@gmail.com')
+  with check ((auth.jwt() ->> 'email') = 'apedrazacespedes@gmail.com');
+
+drop policy if exists "matches read"  on public.matches;
+drop policy if exists "matches admin" on public.matches;
+alter table public.matches enable row level security;
+create policy "matches read"  on public.matches for select using (true);
+create policy "matches admin" on public.matches for all
+  using      ((auth.jwt() ->> 'email') = 'apedrazacespedes@gmail.com')
+  with check ((auth.jwt() ->> 'email') = 'apedrazacespedes@gmail.com');
+
+-- 5) Verificación final: muestra el estado para confirmar que todo quedó bien.
 select
   (select count(*) from public.profiles)                         as usuarios,
   (select count(*) from public.bets)                             as apuestas_guardadas,

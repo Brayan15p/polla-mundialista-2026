@@ -6,10 +6,11 @@ import { supabaseEnabled } from './lib/supabase';
 import {
   cloudSignIn, cloudSignUp, cloudSignOut, cloudCurrentUser, cloudLoadAll,
   cloudSetPlayer, cloudPlaceBet, cloudUpdateResult, cloudSubscribe, cloudSyncMatches,
+  cloudSendPasswordReset, cloudUpdatePassword, cloudOnPasswordRecovery,
 } from './lib/cloud';
 import { Tutorial } from './components/Tutorial';
 import { IntroAnimation } from './components/Intro';
-import { AuthScreen, type RegisterPayload } from './components/Auth';
+import { AuthScreen, ResetPasswordScreen, type RegisterPayload } from './components/Auth';
 import { PlayerSelectScreen } from './components/PlayerSelect';
 import { BgLayer, NavBar } from './components/Shared';
 import { DashboardScreen } from './components/Dashboard';
@@ -32,6 +33,7 @@ export default function App() {
   const [dataSource, setDataSource] = useState<'live' | 'mock'>('mock');
   const [showTutorial, setShowTutorial] = useState(false);
   const [pendingTutorial, setPendingTutorial] = useState(false);
+  const [recovery, setRecovery] = useState(false);
 
   // Load match data (live API with mock fallback)
   useEffect(() => {
@@ -59,6 +61,12 @@ export default function App() {
     })();
     const unsub = cloudSubscribe(refresh);
     return () => { active = false; unsub(); };
+  }, []);
+
+  // Open the "set new password" screen when the user arrives from a recovery email.
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+    return cloudOnPasswordRecovery(() => { setShowIntro(false); setRecovery(true); });
   }, []);
 
   // Persist on change (local mode only — cloud mode is the source of truth).
@@ -151,12 +159,23 @@ export default function App() {
     return matches.reduce((s, m) => s + pointsFor(ub[m.id], m), 0);
   }, [state.currentUser, state.bets, matches]);
 
+  // Save the new password chosen from the recovery email, then log straight in.
+  const submitNewPassword = async (newPassword: string): Promise<{ error?: string }> => {
+    const res = await cloudUpdatePassword(newPassword);
+    if (res.error) return res;
+    const u = await cloudCurrentUser();
+    setRecovery(false);
+    if (u) setState(p => ({ ...p, currentUser: u, view: u.playerId ? 'dashboard' : 'playerSelect' }));
+    return {};
+  };
+
   // ── Render ───────────────────────────────────────────────────────────
   if (showIntro) return <IntroAnimation onComplete={introComplete} />;
+  if (recovery) return <ResetPasswordScreen onSubmit={submitNewPassword} />;
 
   const { currentUser, users, bets, view, showAdmin } = state;
 
-  if (!currentUser) return <AuthScreen onLogin={login} onRegister={register} />;
+  if (!currentUser) return <AuthScreen onLogin={login} onRegister={register} onForgotPassword={supabaseEnabled ? cloudSendPasswordReset : undefined} />;
   if (!currentUser.playerId) return <PlayerSelectScreen onSelect={selectPlayer} />;
   if (showAdmin) return (
     <AdminScreen

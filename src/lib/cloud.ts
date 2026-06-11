@@ -63,6 +63,30 @@ export async function cloudSignOut(): Promise<void> {
   await supabase?.auth.signOut();
 }
 
+// Send a password-reset email. The link returns the user to the app, where the
+// PASSWORD_RECOVERY event (below) opens the "set new password" screen.
+export async function cloudSendPasswordReset(email: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: 'Supabase no configurado' };
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+  return { error: error?.message };
+}
+
+// Set a new password (used after arriving from the recovery email).
+export async function cloudUpdatePassword(newPassword: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: 'Supabase no configurado' };
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  return { error: error?.message };
+}
+
+// Fire `cb` when the user lands from a recovery email so we can show the form.
+export function cloudOnPasswordRecovery(cb: () => void): () => void {
+  if (!supabase) return () => {};
+  const { data } = supabase.auth.onAuthStateChange(event => {
+    if (event === 'PASSWORD_RECOVERY') cb();
+  });
+  return () => data.subscription.unsubscribe();
+}
+
 // Restore the logged-in user on page load (session persists in localStorage).
 export async function cloudCurrentUser(): Promise<User | null> {
   if (!supabase) return null;

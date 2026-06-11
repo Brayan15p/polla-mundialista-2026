@@ -294,7 +294,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
         {participants && participants.length > 0 && (
           <div style={{ marginTop: 10 }}>
             {isDone ? (
-              /* ── FINISHED: Full winner table, auto-expanded ── */
+              /* ── FINISHED: Full winner table with points ── */
               <div>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
@@ -317,8 +317,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                     return (
                       <div key={p.username} style={{
                         padding: '8px 12px', borderRadius: 10, background: bg,
-                        border: `1px solid ${bd}`,
-                        display: 'flex', alignItems: 'center', gap: 8,
+                        border: `1px solid ${bd}`, display: 'flex', alignItems: 'center', gap: 8,
                         outline: p.isMe ? `1px solid ${c}` : 'none',
                       }}>
                         <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>{medal ?? ' '}</span>
@@ -339,8 +338,41 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                   })}
                 </div>
               </div>
+            ) : isLive ? (
+              /* ── LIVE: Reveal bets, no points yet ── */
+              <div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EF4444', display: 'inline-block', animation: 'wc-livePulse 1s infinite', flexShrink: 0 }} />
+                  <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#EF4444' }}>
+                    EN JUEGO · apuestas reveladas
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {participants.map(p => (
+                    <div key={p.username} style={{
+                      padding: '8px 12px', borderRadius: 10,
+                      background: p.hasBet ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${p.hasBet ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      outline: p.isMe ? '1px solid rgba(239,68,68,0.5)' : 'none',
+                    }}>
+                      <span style={{ fontSize: 12 }}>{p.hasBet ? '⚽' : '⏳'}</span>
+                      <span style={{ flex: 1, minWidth: 0, fontFamily: "'Barlow',sans-serif", fontSize: 12, color: p.isMe ? '#fff' : 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: p.isMe ? 700 : 400 }}>
+                        {p.username}{p.isMe ? ' (tú)' : ''}
+                      </span>
+                      <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 15, color: p.hasBet ? '#FFD700' : 'rgba(255,255,255,0.2)', letterSpacing: 1, flexShrink: 0 }}>
+                        {p.hasBet ? (p.kind === 'winner' ? (p.pick === 'H' ? `Gana ${match.home}` : p.pick === 'A' ? `Gana ${match.away}` : 'Empate') : `${p.home}–${p.away}`) : 'no apostó'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
-              /* ── OPEN / LOCKED (not finished): show who bet vs who hasn't, hide exact values ── */
+              /* ── OPEN / LOCKED: hide exact bets, show ✅/⏳ ── */
               <div>
                 <button onClick={() => setShowBets(s => !s)} style={{
                   width: '100%', padding: '9px 14px',
@@ -379,7 +411,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
                       </div>
                     ))}
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', fontFamily: "'Barlow',sans-serif", paddingTop: 2 }}>
-                      Las apuestas exactas se revelan al terminar el partido
+                      Las apuestas se revelan cuando inicia el partido
                     </div>
                   </div>
                 )}

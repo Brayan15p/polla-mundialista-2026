@@ -3,6 +3,8 @@ import { FLAGS, PLAYERS, pointsFor, type Match } from '../lib/data';
 import type { User, Bet } from '../lib/state';
 import { AvatarBubble } from './Shared';
 import { PlayerSelectScreen } from './PlayerSelect';
+import { cloudDiagnose } from '../lib/cloud';
+import { supabaseEnabled } from '../lib/supabase';
 
 interface ProfileScreenProps {
   user: User;
@@ -17,6 +19,8 @@ interface ProfileScreenProps {
 
 export function ProfileScreen({ user, users, bets, matches, onChangePlayer, onLogout, isAdmin, onShowAdmin }: ProfileScreenProps) {
   const [showSel, setShowSel] = useState(false);
+  const [diagLines, setDiagLines] = useState<string[] | null>(null);
+  const [diagRunning, setDiagRunning] = useState(false);
   const player = PLAYERS.find(p => p.id === user.playerId);
   const ub = bets[user.id] || {};
 
@@ -95,6 +99,28 @@ export function ProfileScreen({ user, users, bets, matches, onChangePlayer, onLo
             <div style={{ color: '#FFD700', fontWeight: 700, fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, letterSpacing: 1 }}>INSCRITO EN LA BOLSA GENERAL</div>
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: "'Barlow',sans-serif" }}>Pagaste $100.000 COP · ¡Mucha suerte campeón!</div>
           </div>
+        </div>
+      )}
+
+      {/* Connection / role status + diagnostics — visible to every user so
+          problems can be diagnosed even when the admin panel is unreachable. */}
+      {supabaseEnabled && (
+        <div style={{ marginBottom: 14, padding: '14px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 14 }}>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13, color: '#3B82F6', letterSpacing: 1 }}>☁️ CONEXIÓN A LA NUBE</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontFamily: "'Barlow',sans-serif", margin: '6px 0 10px', lineHeight: 1.6 }}>
+            Sesión: <span style={{ color: '#fff' }}>{user.email || '(sin correo — vuelve a iniciar sesión)'}</span><br />
+            Rol: <span style={{ color: isAdmin ? '#FFD700' : '#fff' }}>{isAdmin ? '👑 SUPER USUARIO' : 'Jugador'}</span>
+          </div>
+          <button onClick={async () => { setDiagRunning(true); setDiagLines(await cloudDiagnose()); setDiagRunning(false); }} disabled={diagRunning} style={{
+            padding: '10px 18px', background: diagRunning ? '#555' : 'linear-gradient(135deg,#60A5FA,#3B82F6)', border: 'none',
+            borderRadius: 10, color: '#fff', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+            fontSize: 13, letterSpacing: 1, cursor: diagRunning ? 'wait' : 'pointer',
+          }}>{diagRunning ? '⏳ VERIFICANDO…' : '🔍 VERIFICAR GUARDADO DE APUESTAS'}</button>
+          {diagLines && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(0,0,0,0.4)', borderRadius: 10, fontFamily: 'monospace', fontSize: 11, lineHeight: 1.8, color: '#E2E8F0', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {diagLines.map((l, i) => <div key={i}>{l}</div>)}
+            </div>
+          )}
         </div>
       )}
 

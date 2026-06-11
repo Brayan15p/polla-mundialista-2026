@@ -13,13 +13,14 @@ interface ProfileRow {
   player_id: string | null;
   pool_joined: boolean;
   created_at: string;
+  email?: string | null;   // copied from Auth by fix_all.sql; may be absent on old schemas
 }
 
 function toUser(p: ProfileRow, email = ''): User {
   return {
     id: p.id,
     username: p.username,
-    email,
+    email: p.email || email,  // prefer the stored one; fall back to the session's
     password: '',
     playerId: p.player_id,
     poolJoined: p.pool_joined,

@@ -10,8 +10,10 @@ create table if not exists public.profiles (
   username    text not null,
   player_id   text,                       -- chosen FUT-style card (messi, mbappe, …)
   pool_joined boolean not null default false,
+  email       text,                       -- copied from Auth; drives the admin role
   created_at  timestamptz not null default now()
 );
+alter table public.profiles add column if not exists email text;
 
 -- 2) BETS — one row per (user, match). A user can only have one bet per match.
 create table if not exists public.bets (
@@ -92,13 +94,14 @@ create policy "results admin" on public.match_results for all
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, username, pool_joined)
+  insert into public.profiles (id, username, pool_joined, email)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'username', 'Jugador'),
-    coalesce((new.raw_user_meta_data->>'pool_joined')::boolean, false)
+    coalesce((new.raw_user_meta_data->>'pool_joined')::boolean, false),
+    new.email
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update set email = excluded.email;
   return new;
 end; $$;
 

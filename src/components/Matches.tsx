@@ -36,19 +36,16 @@ function fmtCountdown(secs: number): string {
 // One participant's prediction + outcome on a match.
 interface Participant {
   username: string;
+  isMe: boolean;          // true = the current logged-in user
   home: number;
   away: number;
   kind: BetKind;
   pick?: Outcome;
-  isDefault: boolean;     // true = auto 0–0 (player placed no bet)
+  isDefault: boolean;     // true = auto 0–0 (no bet placed, or hasn't bet yet)
+  hasBet: boolean;        // false = user hasn't placed any bet yet
   points: number | null;  // null while the match isn't finished
 }
 
-// Compact label for a bet (score "2–1" or winner "1 / X / 2").
-function betShort(b: { kind?: BetKind; pick?: Outcome; home: number; away: number }): string {
-  if (b.kind === 'winner') return b.pick === 'H' ? '1' : b.pick === 'A' ? '2' : 'X';
-  return `${b.home}–${b.away}`;
-}
 
 interface MatchBetCardProps {
   match: Match;
@@ -103,8 +100,6 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
     setTimeout(() => setSaved(false), 2800);
   };
 
-  const pts = isDone ? pointsFor(bet, match) : null;
-  const ptsColor = pts === 3 ? '#22C55E' : pts === 1 ? '#FFD700' : '#6B7280';
 
   const numInp: CSSProperties = {
     width: 58, height: 58, textAlign: 'center', fontSize: 30,
@@ -295,66 +290,101 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
           </div>
         )}
 
-        {/* Who bet / who won */}
+        {/* Participants panel: shown when match is locked (≤5 min) or finished */}
         {!canBetNow && participants && participants.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <button onClick={() => setShowBets(s => !s)} style={{
-              width: '100%', padding: '9px 14px',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              color: isDone ? '#FFD700' : 'rgba(255,255,255,0.4)',
-              fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700,
-            }}>
-              <span>{isDone
-                ? `🏆 QUIÉN ACERTÓ · ${participants.filter(p => (p.points ?? 0) > 0).length} con puntos`
-                : `👥 ${participants.length} ${participants.length === 1 ? 'apuesta' : 'apuestas'} de otros jugadores`}</span>
-              <span style={{ transition: 'transform 0.2s', transform: showBets ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▾</span>
-            </button>
-            {showBets && (
-              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {participants.map(p => {
-                  const c = p.points === 3 ? '#22C55E' : p.points === 1 ? '#FFD700' : 'rgba(255,255,255,0.3)';
-                  return (
-                    <div key={p.username} style={{
-                      padding: '9px 12px', borderRadius: 10,
-                      background: p.points === 3 ? 'rgba(34,197,94,0.08)' : p.points === 1 ? 'rgba(255,215,0,0.06)' : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${p.points === 3 ? 'rgba(34,197,94,0.25)' : p.points === 1 ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.07)'}`,
-                      display: 'flex', alignItems: 'center', gap: 10,
-                    }}>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'rgba(255,255,255,0.6)', fontFamily: "'Barlow',sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.points === 3 && '👑 '}{p.username}
-                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}> · {p.kind === 'winner' ? 'ganador' : 'marcador'}{p.isDefault ? ' (def.)' : ''}</span>
+            {isDone ? (
+              /* ── FINISHED: Full winner table, auto-expanded ── */
+              <div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                  padding: '8px 12px', borderRadius: 10,
+                  background: 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(201,166,44,0.06))',
+                  border: '1px solid rgba(255,215,0,0.25)',
+                }}>
+                  <span style={{ fontSize: 14 }}>🏆</span>
+                  <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#FFD700' }}>
+                    TABLA DE PUNTOS · {participants.filter(p => (p.points ?? 0) > 0).length} acertaron
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {participants.map((p, i) => {
+                    const rank = i + 1;
+                    const medal = rank === 1 && (p.points ?? 0) > 0 ? '🥇' : rank === 2 && (p.points ?? 0) > 0 ? '🥈' : rank === 3 && (p.points ?? 0) > 0 ? '🥉' : null;
+                    const c = p.points === 3 ? '#22C55E' : p.points === 1 ? '#FFD700' : 'rgba(255,255,255,0.28)';
+                    const bg = p.points === 3 ? 'rgba(34,197,94,0.09)' : p.points === 1 ? 'rgba(255,215,0,0.07)' : 'rgba(255,255,255,0.02)';
+                    const bd = p.points === 3 ? 'rgba(34,197,94,0.28)' : p.points === 1 ? 'rgba(255,215,0,0.18)' : 'rgba(255,255,255,0.06)';
+                    return (
+                      <div key={p.username} style={{
+                        padding: '8px 12px', borderRadius: 10, background: bg,
+                        border: `1px solid ${bd}`,
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        outline: p.isMe ? `1px solid ${c}` : 'none',
+                      }}>
+                        <span style={{ fontSize: 14, width: 20, textAlign: 'center', flexShrink: 0 }}>{medal ?? ' '}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontFamily: "'Barlow',sans-serif", fontSize: 12, color: p.isMe ? '#fff' : 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: p.isMe ? 700 : 400 }}>
+                          {p.username}{p.isMe ? ' (tú)' : ''}
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', marginLeft: 4 }}>
+                            {p.hasBet ? (p.kind === 'winner' ? 'ganador' : 'marcador') : 'sin apostar'}
+                          </span>
+                        </span>
+                        <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 15, color: p.hasBet ? '#FFD700' : 'rgba(255,255,255,0.2)', letterSpacing: 1, flexShrink: 0 }}>
+                          {p.hasBet ? (p.kind === 'winner' ? (p.pick === 'H' ? `Gana ${match.home}` : p.pick === 'A' ? `Gana ${match.away}` : 'Empate') : `${p.home}–${p.away}`) : '—'}
+                        </span>
+                        <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 18, color: c, minWidth: 32, textAlign: 'right', flexShrink: 0 }}>
+                          {p.points !== null ? `+${p.points}` : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* ── LOCKED (not finished): show who bet vs who hasn't, hide exact values ── */
+              <div>
+                <button onClick={() => setShowBets(s => !s)} style={{
+                  width: '100%', padding: '9px 14px',
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  color: 'rgba(255,255,255,0.5)',
+                  fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700,
+                }}>
+                  <span>
+                    👥 {participants.filter(p => p.hasBet).length}/{participants.length} apostaron
+                    {participants.some(p => !p.hasBet) && (
+                      <span style={{ color: 'rgba(255,100,100,0.7)', marginLeft: 6 }}>
+                        · {participants.filter(p => !p.hasBet).length} sin apostar
                       </span>
-                      <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 16, color: '#FFD700', letterSpacing: 1, flexShrink: 0 }}>{betShort(p)}</span>
-                      {p.points !== null && (
-                        <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 16, color: c, flexShrink: 0, minWidth: 28, textAlign: 'right' }}>+{p.points}</span>
-                      )}
+                    )}
+                  </span>
+                  <span style={{ transition: 'transform 0.2s', transform: showBets ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>▾</span>
+                </button>
+                {showBets && (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {participants.map(p => (
+                      <div key={p.username} style={{
+                        padding: '7px 12px', borderRadius: 9,
+                        background: p.hasBet ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${p.hasBet ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}>
+                        <span style={{ fontSize: 12 }}>{p.hasBet ? '✅' : '⏳'}</span>
+                        <span style={{ flex: 1, fontFamily: "'Barlow',sans-serif", fontSize: 12, color: p.isMe ? '#fff' : 'rgba(255,255,255,0.6)', fontWeight: p.isMe ? 700 : 400 }}>
+                          {p.username}{p.isMe ? ' (tú)' : ''}
+                        </span>
+                        <span style={{ fontSize: 11, color: p.hasBet ? 'rgba(34,197,94,0.7)' : 'rgba(255,80,80,0.6)', fontFamily: "'Barlow Condensed',sans-serif", letterSpacing: 1 }}>
+                          {p.hasBet ? 'APOSTÓ 🔒' : 'SIN APOSTAR'}
+                        </span>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', fontFamily: "'Barlow',sans-serif", paddingTop: 2 }}>
+                      Las apuestas exactas se revelan al terminar el partido
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Your own result */}
-        {pts !== null && (
-          <div style={{
-            marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 14px', borderRadius: 10,
-            background: `rgba(${pts === 3 ? '34,197,94' : pts === 1 ? '255,215,0' : '107,114,128'},0.1)`,
-            border: `1px solid rgba(${pts === 3 ? '34,197,94' : pts === 1 ? '255,215,0' : '107,114,128'},0.2)`,
-          }}>
-            <div>
-              <div style={{ fontSize: 13, color: ptsColor, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700 }}>
-                {pts === 3 ? '🎯 ¡Marcador exacto!' : pts === 1 ? '✅ ¡Acertaste!' : '❌ Sin puntos'}
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                Tu apuesta: {bet != null ? (bet.kind === 'winner' ? winnerLabel(bet.pick) : `${bet.home}–${bet.away}`) : '0–0 (por defecto)'} · Real: {match.homeScore}–{match.awayScore}
-              </div>
-            </div>
-            <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 32, color: ptsColor, lineHeight: 1 }}>+{pts}</div>
           </div>
         )}
       </div>
@@ -499,27 +529,37 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
 
               {dayMatches.map(m => {
                 const bettable = canBet(m.date, m.status) && teamsKnown(m);
+                const locked = !bettable && teamsKnown(m);
                 let participants: Participant[] = [];
-                if (m.status === 'finished') {
-                  participants = users
-                    .filter(u => u.id !== user.id)
-                    .map(u => {
-                      const b = bets[u.id]?.[m.id];
-                      return {
-                        username: u.username, home: b?.home ?? 0, away: b?.away ?? 0,
-                        kind: (b?.kind ?? 'score') as BetKind, pick: b?.pick,
-                        isDefault: !b, points: pointsFor(b, m),
-                      };
-                    })
-                    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0) || a.username.localeCompare(b.username));
-                } else if (!bettable && teamsKnown(m)) {
-                  participants = users
-                    .filter(u => u.id !== user.id && bets[u.id]?.[m.id])
-                    .map(u => {
-                      const b = bets[u.id][m.id];
-                      return { username: u.username, home: b.home, away: b.away, kind: (b.kind ?? 'score') as BetKind, pick: b.pick, isDefault: false, points: null };
-                    });
+
+                if (locked || m.status === 'finished') {
+                  // Show ALL registered users: who bet, who didn't, who won.
+                  participants = users.map(u => {
+                    const b = bets[u.id]?.[m.id];
+                    return {
+                      username: u.username,
+                      isMe: u.id === user.id,
+                      home: b?.home ?? 0,
+                      away: b?.away ?? 0,
+                      kind: (b?.kind ?? 'score') as BetKind,
+                      pick: b?.pick,
+                      hasBet: !!b,
+                      isDefault: !b,
+                      points: m.status === 'finished' ? pointsFor(b, m) : null,
+                    };
+                  });
+
+                  if (m.status === 'finished') {
+                    // Winners first, then by points, then alpha
+                    participants.sort((a, b) =>
+                      (b.points ?? 0) - (a.points ?? 0) || a.username.localeCompare(b.username));
+                  } else {
+                    // Those who bet come before those who haven't
+                    participants.sort((a, b) =>
+                      (a.hasBet ? 0 : 1) - (b.hasBet ? 0 : 1) || a.username.localeCompare(b.username));
+                  }
                 }
+
                 return (
                   <MatchBetCard key={m.id} match={m} bet={userBets[m.id]}
                     canBetNow={bettable}

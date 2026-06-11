@@ -67,10 +67,9 @@ export function MyBetsScreen({ user, users, bets, matches, onBet }: MyBetsScreen
           )}
           {mine.filter(m => m.status === 'finished').map(m => {
             const participants = users
-              .filter(u => u.id !== user.id)
               .map(u => {
                 const b = bets[u.id]?.[m.id];
-                return { username: u.username, home: b?.home ?? 0, away: b?.away ?? 0, kind: (b?.kind ?? 'score') as BetKind, pick: b?.pick, isDefault: !b, points: pointsFor(b, m) };
+                return { username: u.username, isMe: u.id === user.id, home: b?.home ?? 0, away: b?.away ?? 0, kind: (b?.kind ?? 'score') as BetKind, pick: b?.pick, hasBet: !!b, isDefault: !b, points: pointsFor(b, m) };
               })
               .sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
             return (

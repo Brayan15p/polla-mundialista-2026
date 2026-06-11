@@ -66,11 +66,13 @@ export function mapMatch(m: RawMatch, idx: number): Match {
   // shifting every API kickoff 5 hours. Preserve the zone and let the formatter
   // convert it correctly.
   const date = m.utcDate || `2026-06-12T${String(12 + (idx % 8)).padStart(2, '0')}:00-05:00`;
-  // Use venue from our bundled fixture (API doesn't return stadium names).
+  // Use the fixture match for stable ID, venue, group and stage — API returns
+  // numeric ids ('api-123') that change across requests and would orphan saved bets.
   const fixtureMatch = MATCHES.find(f => f.home === home && f.away === away);
   return {
-    id: 'api-' + m.id,
-    group,
+    id: fixtureMatch?.id ?? ('api-' + m.id),
+    group: fixtureMatch?.group ?? group,
+    stage: fixtureMatch?.stage,
     home,
     away,
     date,

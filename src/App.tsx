@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { pointsFor, type Match } from './lib/data';
+import { pointsFor, type Match, type BetKind, type Outcome } from './lib/data';
 import { fetchMatches } from './lib/api';
 import { loadState, saveState, type AppState, type User, type View } from './lib/state';
 import { supabaseEnabled } from './lib/supabase';
@@ -9,12 +9,14 @@ import {
   cloudSendPasswordReset, cloudUpdatePassword, cloudOnPasswordRecovery,
 } from './lib/cloud';
 import { Tutorial } from './components/Tutorial';
+import { Celebration } from './components/Celebration';
 import { IntroAnimation } from './components/Intro';
 import { AuthScreen, ResetPasswordScreen, type RegisterPayload } from './components/Auth';
 import { PlayerSelectScreen } from './components/PlayerSelect';
 import { BgLayer, NavBar } from './components/Shared';
 import { DashboardScreen } from './components/Dashboard';
 import { MatchesScreen } from './components/Matches';
+import { MyBetsScreen } from './components/MyBets';
 import { BracketScreen } from './components/Bracket';
 import { LeaderboardScreen } from './components/Leaderboard';
 import { ProfileScreen } from './components/Profile';
@@ -34,6 +36,7 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [pendingTutorial, setPendingTutorial] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  const [celebratePoints, setCelebratePoints] = useState<number | null>(null);
 
   // Load match data (live API with mock fallback)
   useEffect(() => {
@@ -77,6 +80,22 @@ export default function App() {
     const r = state.matchResults[m.id];
     return r ? { ...m, homeScore: r.home, awayScore: r.away, status: 'finished' as const } : m;
   }), [baseMatches, state.matchResults]);
+
+  // Celebrate when a result posts and the user's own bet won points (once each).
+  useEffect(() => {
+    const u = state.currentUser;
+    if (!u) return;
+    const key = `pollaCelebrated_${u.id}`;
+    let seen: string[] = [];
+    try { seen = JSON.parse(localStorage.getItem(key) || '[]'); } catch { /* ignore */ }
+    const ub = state.bets[u.id] || {};
+    const newlyFinished = matches.filter(m => m.status === 'finished' && !seen.includes(m.id));
+    if (newlyFinished.length === 0) return;
+    // Only celebrate real placed bets that scored (not the 0–0 default).
+    const wonPoints = newlyFinished.reduce((s, m) => s + (ub[m.id] ? pointsFor(ub[m.id], m) : 0), 0);
+    localStorage.setItem(key, JSON.stringify([...seen, ...newlyFinished.map(m => m.id)]));
+    if (wonPoints > 0) setCelebratePoints(wonPoints);
+  }, [matches, state.bets, state.currentUser]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const introComplete = () => { setShowIntro(false); };
@@ -131,12 +150,13 @@ export default function App() {
     if (pendingTutorial) { setShowTutorial(true); setPendingTutorial(false); }
   };
 
-  const placeBet = (matchId: string, home: number, away: number) => {
+  const placeBet = (matchId: string, payload: { home: number; away: number; kind: BetKind; pick?: Outcome }) => {
     const uid = state.currentUser!.id;
-    if (supabaseEnabled) cloudPlaceBet(uid, matchId, home, away);
+    const bet = { ...payload, at: new Date().toISOString() };
+    if (supabaseEnabled) cloudPlaceBet(uid, matchId, bet);
     setState(p => ({
       ...p,
-      bets: { ...p.bets, [uid]: { ...(p.bets[uid] || {}), [matchId]: { home, away, at: new Date().toISOString() } } },
+      bets: { ...p.bets, [uid]: { ...(p.bets[uid] || {}), [matchId]: bet } },
     }));
   };
 
@@ -190,6 +210,7 @@ export default function App() {
     <div style={{ background: '#050508', minHeight: '100vh' }}>
       <BgLayer />
       {showTutorial && <Tutorial user={currentUser} onClose={() => setShowTutorial(false)} />}
+      {celebratePoints !== null && <Celebration points={celebratePoints} onDone={() => setCelebratePoints(null)} />}
       <NavBar user={currentUser} view={view} onNavigate={go} onLogout={logout} userPoints={userTotalPoints} />
 
       {dataSource === 'live' && (
@@ -198,6 +219,7 @@ export default function App() {
 
       {view === 'dashboard' && <DashboardScreen user={currentUser} users={users} bets={bets} matches={matches} onNavigate={go} />}
       {view === 'matches' && <MatchesScreen user={currentUser} users={users} bets={bets} matches={matches} onBet={placeBet} />}
+      {view === 'mybets' && <MyBetsScreen user={currentUser} users={users} bets={bets} matches={matches} onBet={placeBet} />}
       {view === 'bracket' && <BracketScreen matches={matches} />}
       {view === 'leaderboard' && <LeaderboardScreen users={users} bets={bets} matches={matches} currentUser={currentUser} />}
       {view === 'profile' && (

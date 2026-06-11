@@ -2,6 +2,11 @@
 
 export type Tier = 'legend' | 'gold' | 'silver' | 'bronze';
 export type MatchStatus = 'upcoming' | 'live' | 'finished';
+export type Outcome = 'H' | 'D' | 'A';      // local gana / empate / visitante gana
+export type BetKind = 'score' | 'winner';   // marcador exacto · solo ganador
+
+// Placeholder team name for knockout matches whose rivals aren't known yet.
+export const TBD = 'Por definir';
 
 export interface Player {
   id: string;
@@ -18,7 +23,8 @@ export interface Player {
 
 export interface Match {
   id: string;
-  group: string;
+  group: string;        // 'A'..'L' for group stage, '' for knockout
+  stage?: string;       // knockout round label (e.g. '32avos', 'Octavos', 'Final')
   home: string;
   away: string;
   date: string;
@@ -27,6 +33,11 @@ export interface Match {
   homeScore?: number;
   awayScore?: number;
   minute?: number;
+}
+
+// Are both teams of a match known yet? (knockout matches start as TBD)
+export function teamsKnown(m: Match): boolean {
+  return m.home !== TBD && m.away !== TBD && !!m.home && !!m.away;
 }
 
 export interface Group {
@@ -164,7 +175,46 @@ function buildGroupStage(): Match[] {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export const MATCHES: Match[] = buildGroupStage();
+// Knockout bracket: 16 + 8 + 4 + 2 + 1 (3rd place) + 1 (final) = 32 matches.
+// Teams are "Por definir" until the group stage / previous round decides them;
+// betting stays locked on a match until both rivals are known (teamsKnown).
+const KNOCKOUT_SPEC: { stage: string; count: number; day: number; times: string[] }[] = [
+  { stage: '32avos',  count: 16, day: 28, times: ['12:00', '15:00', '18:00'] }, // 28 jun – 3 jul
+  { stage: 'Octavos', count: 8,  day: 4,  times: ['14:00', '18:00'] },          // 4 – 7 jul (month +1)
+  { stage: 'Cuartos', count: 4,  day: 9,  times: ['15:00', '19:00'] },          // 9 – 11 jul
+  { stage: 'Semifinal', count: 2, day: 14, times: ['18:00'] },                  // 14 – 15 jul
+  { stage: 'Tercer puesto', count: 1, day: 18, times: ['15:00'] },              // 18 jul
+  { stage: 'Final',   count: 1,  day: 19, times: ['15:00'] },                   // 19 jul
+];
+
+function buildKnockout(): Match[] {
+  const out: Match[] = [];
+  let venueIdx = 5;
+  KNOCKOUT_SPEC.forEach(spec => {
+    const isJune = spec.stage === '32avos';
+    for (let i = 0; i < spec.count; i++) {
+      const dayOffset = Math.floor(i / spec.times.length);
+      const day = spec.day + dayOffset;
+      const month = isJune && day <= 30 ? '06' : '07';
+      const realDay = isJune && day > 30 ? day - 30 : day;
+      const time = spec.times[i % spec.times.length];
+      out.push({
+        id: `KO-${spec.stage}-${i + 1}`,
+        group: '',
+        stage: spec.stage,
+        home: TBD,
+        away: TBD,
+        date: `2026-${month}-${String(realDay).padStart(2, '0')}T${time}`,
+        venue: HOST_VENUES[venueIdx++ % HOST_VENUES.length],
+        status: 'upcoming',
+      });
+    }
+  });
+  return out;
+}
+
+// Full tournament: 72 group-stage + 32 knockout = 104 matches.
+export const MATCHES: Match[] = [...buildGroupStage(), ...buildKnockout()];
 
 export const TEAM_STRENGTH: Record<string, number> = {
   'France': 90, 'Brazil': 89, 'Argentina': 88, 'England': 88,
@@ -193,36 +243,65 @@ export function winProbability(home: string, away: string): { home: number; draw
   return { home: h, draw: d, away: 100 - h - d };
 }
 
+export function outcomeOf(h: number, a: number): Outcome {
+  return h > a ? 'H' : h < a ? 'A' : 'D';
+}
+
 export function calculatePoints(bH: number, bA: number, rH: number, rA: number): number {
-  if (bH === rH && bA === rA) return 3;
-  const bW = bH > bA ? 'H' : bH < bA ? 'A' : 'D';
-  const rW = rH > rA ? 'H' : rH < rA ? 'A' : 'D';
-  return bW === rW ? 1 : 0;
+  if (bH === rH && bA === rA) return 3;             // marcador exacto
+  return outcomeOf(bH, bA) === outcomeOf(rH, rA) ? 1 : 0; // solo el ganador/empate
+}
+
+// A bet is either an exact-score guess or a winner-only (1X2) guess.
+export interface BetLike {
+  home?: number;
+  away?: number;
+  kind?: BetKind;     // undefined === 'score' (backward compatible)
+  pick?: Outcome;     // used when kind === 'winner'
 }
 
 // Business rule: a registered player who does NOT place a bet on a match still
-// competes — they are entered automatically with a 0–0 default prediction.
-export const DEFAULT_BET = { home: 0, away: 0 } as const;
+// competes — they are entered automatically with a 0–0 exact-score prediction.
+export const DEFAULT_BET = { home: 0, away: 0, kind: 'score' as BetKind } as const;
 
-// Points a player earns on a match, applying the 0–0 default for missing bets.
-// Returns 0 for matches that aren't finished yet.
-export function pointsFor(bet: { home: number; away: number } | undefined, m: Match): number {
+// Points scheme (decided by the pool):
+//   • Marcador (score): 3 if exact, 1 if only the winner/draw is right, else 0.
+//   • Resultado (winner/1X2): 1 if the outcome is right, else 0.
+// This is the single source of truth — every screen scores through it so the
+// rules can't drift or be bypassed.
+export function pointsFor(bet: BetLike | undefined, m: Match): number {
   if (m.status !== 'finished' || m.homeScore == null || m.awayScore == null) return 0;
+  const real = outcomeOf(m.homeScore, m.awayScore);
+  if (bet?.kind === 'winner') {
+    return bet.pick === real ? 1 : 0;
+  }
   const b = bet ?? DEFAULT_BET;
-  return calculatePoints(b.home, b.away, m.homeScore, m.awayScore);
+  return calculatePoints(b.home ?? 0, b.away ?? 0, m.homeScore, m.awayScore);
+}
+
+// Match times are stored as Colombia local time (UTC−5). Build the real instant
+// so the deadline and the displayed time are correct on any device.
+function toInstant(iso: string): Date {
+  // 'YYYY-MM-DDTHH:MM' → append seconds + Colombia offset if no zone is present.
+  const hasZone = /[Zz]|[+-]\d\d:?\d\d$/.test(iso);
+  return new Date(hasZone ? iso : `${iso.length <= 16 ? iso + ':00' : iso}-05:00`);
 }
 
 export function canBet(matchDate: string, matchStatus: MatchStatus): boolean {
   if (matchStatus !== 'upcoming') return false;
-  const deadline = new Date(matchDate).getTime() - 5 * 60 * 1000;
+  const deadline = toInstant(matchDate).getTime() - 5 * 60 * 1000;
   return Date.now() < deadline;
 }
 
 export function fmtDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-CO', { weekday: 'short', month: 'short', day: 'numeric' });
+  return toInstant(iso).toLocaleDateString('es-CO', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Bogota',
+  });
 }
 
+// Colombian time in 12-hour format, e.g. "1:00 p. m.".
 export function fmtTime(iso: string): string {
-  return iso.split('T')[1] ? iso.split('T')[1].substring(0, 5) : '';
+  return toInstant(iso).toLocaleTimeString('es-CO', {
+    hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Bogota',
+  });
 }

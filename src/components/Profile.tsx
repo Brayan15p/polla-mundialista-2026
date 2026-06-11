@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FLAGS, PLAYERS, calculatePoints, type Match } from '../lib/data';
+import { FLAGS, PLAYERS, pointsFor, type Match } from '../lib/data';
 import type { User, Bet } from '../lib/state';
 import { AvatarBubble } from './Shared';
 import { PlayerSelectScreen } from './PlayerSelect';
@@ -19,11 +19,12 @@ export function ProfileScreen({ user, users, bets, matches, onChangePlayer, onLo
   const player = PLAYERS.find(p => p.id === user.playerId);
   const ub = bets[user.id] || {};
 
+  // Points count every finished match (0–0 default rule); "bets" = placed bets.
   const stats = matches.reduce((s, m) => {
     if (m.status !== 'finished') return s;
-    const b = ub[m.id]; if (!b) return s;
-    const p = calculatePoints(b.home, b.away, m.homeScore!, m.awayScore!);
-    return { pts: s.pts + p, exact: s.exact + (p === 3 ? 1 : 0), bets: s.bets + 1 };
+    const b = ub[m.id];
+    const p = pointsFor(b, m);
+    return { pts: s.pts + p, exact: s.exact + (p === 3 ? 1 : 0), bets: s.bets + (b ? 1 : 0) };
   }, { pts: 0, exact: 0, bets: 0 });
 
   const pool = users.filter(u => u.poolJoined).length * 100000;

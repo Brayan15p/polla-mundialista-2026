@@ -130,9 +130,12 @@ export async function cloudSetPlayer(userId: string, playerId: string): Promise<
   await supabase?.from('profiles').update({ player_id: playerId }).eq('id', userId);
 }
 
-export async function cloudPlaceBet(userId: string, matchId: string, home: number, away: number): Promise<void> {
+export async function cloudPlaceBet(
+  userId: string, matchId: string,
+  bet: { home: number; away: number; kind?: string; pick?: string },
+): Promise<void> {
   await supabase?.from('bets').upsert(
-    { user_id: userId, match_id: matchId, home, away },
+    { user_id: userId, match_id: matchId, home: bet.home, away: bet.away, kind: bet.kind ?? 'score', pick: bet.pick ?? null },
     { onConflict: 'user_id,match_id' },
   );
 }
@@ -160,15 +163,19 @@ export async function cloudLoadAll(): Promise<CloudData> {
 
   const [profilesRes, betsRes, resultsRes] = await Promise.all([
     supabase.from('profiles').select('*'),
-    supabase.from('bets').select('user_id, match_id, home, away'),
+    supabase.from('bets').select('user_id, match_id, home, away, kind, pick'),
     supabase.from('match_results').select('match_id, home, away'),
   ]);
 
   const users = (profilesRes.data as ProfileRow[] | null)?.map(toUser) ?? [];
 
   const bets: CloudData['bets'] = {};
-  for (const b of (betsRes.data ?? []) as { user_id: string; match_id: string; home: number; away: number }[]) {
-    (bets[b.user_id] ??= {})[b.match_id] = { home: b.home, away: b.away };
+  for (const b of (betsRes.data ?? []) as { user_id: string; match_id: string; home: number; away: number; kind?: string; pick?: string }[]) {
+    (bets[b.user_id] ??= {})[b.match_id] = {
+      home: b.home, away: b.away,
+      kind: (b.kind as 'score' | 'winner') ?? 'score',
+      pick: (b.pick as 'H' | 'D' | 'A' | undefined) ?? undefined,
+    };
   }
 
   const matchResults: CloudData['matchResults'] = {};

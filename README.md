@@ -9,7 +9,10 @@ prototype, rebuilt as a real **Vite + React + TypeScript** application.
 - 🔐 Login / registration with optional entry into the general pool ($100,000 COP)
 - 👤 FIFA Ultimate Team–style player selection (14 players across legend/gold/silver/bronze tiers)
 - 📊 Dashboard with your points, live pool total, live match, and recent results
-- 📅 Matches & betting — 3 pts exact score · 1 pt correct winner · betting locks 5 min before kickoff
+- 📅 Matches & betting — two bet types: **Marcador** (exact score: 3 pts exact / 1 pt right winner) or **Resultado** (winner-only 1X2: 1 pt). Betting locks 5 min before kickoff.
+- 🗓️ Full **104-match** fixture (72 group + 32 knockout). Knockout games show "Por definir" until the rivals are known, then unlock for betting. Kickoff times in Colombian time (UTC−5), 12-hour a. m./p. m.
+- 🎟️ **Mis Apuestas** tab — all your bets, points and pending games in one place.
+- 🎉 Celebration animation when your bet wins points.
 - 🧮 No-bet rule: a registered player who skips a match still competes, entered automatically with a **0–0 default** prediction (`pointsFor` in `src/lib/data.ts`)
 - 🗺️ Fase Final view — countdown to the final, group tables (cuadrangulares), and the knockout bracket
 - 🏆 Real-time leaderboard with animated podium
@@ -86,6 +89,10 @@ lock un-bypassable** — even by calling the API directly — run
 `supabase/anti_fraud.sql`, then sign in as admin and press **🔄 Sincronizar
 partidos** in the admin panel. A database trigger then rejects any bet placed
 within 5 minutes of kickoff.
+
+For the two bet types, also run `supabase/migration_bet_kind.sql` once — it adds
+the `kind`/`pick` columns plus CHECK constraints so a winner bet can't be forged
+to claim exact-score points.
 
 ## Player photos
 

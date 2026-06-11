@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePoints, pointsFor, canBet, winProbability, type Match } from './data';
+import { calculatePoints, pointsFor, canBet, winProbability, teamsKnown, fmtTime, MATCHES, TBD, type Match } from './data';
 import { groupStandings } from './standings';
 
 describe('calculatePoints', () => {
@@ -37,6 +37,39 @@ describe('pointsFor — 0-0 default rule', () => {
   it('returns 0 for matches that are not finished', () => {
     const upcoming: Match = { ...finished(1, 0), status: 'upcoming', homeScore: undefined, awayScore: undefined };
     expect(pointsFor({ home: 1, away: 0 }, upcoming)).toBe(0);
+  });
+});
+
+describe('pointsFor — winner (1X2) bets', () => {
+  it('gives 1 for the correct winner pick, 0 otherwise', () => {
+    expect(pointsFor({ home: 0, away: 0, kind: 'winner', pick: 'H' }, finished(2, 0))).toBe(1);
+    expect(pointsFor({ home: 0, away: 0, kind: 'winner', pick: 'A' }, finished(2, 0))).toBe(0);
+    expect(pointsFor({ home: 0, away: 0, kind: 'winner', pick: 'D' }, finished(1, 1))).toBe(1);
+  });
+  it('never awards 3 to a winner bet, even if the score coincides', () => {
+    expect(pointsFor({ home: 2, away: 1, kind: 'winner', pick: 'H' }, finished(2, 1))).toBe(1);
+  });
+});
+
+describe('fixture integrity', () => {
+  it('has 104 matches total (72 group + 32 knockout)', () => {
+    expect(MATCHES.length).toBe(104);
+    expect(MATCHES.filter(m => m.group).length).toBe(72);
+    expect(MATCHES.filter(m => !m.group).length).toBe(32);
+  });
+  it('knockout matches start with both teams undefined (TBD)', () => {
+    const ko = MATCHES.filter(m => !m.group);
+    expect(ko.every(m => m.home === TBD && m.away === TBD)).toBe(true);
+    expect(ko.every(m => !teamsKnown(m))).toBe(true);
+  });
+  it('group matches have known teams', () => {
+    expect(MATCHES.filter(m => m.group).every(teamsKnown)).toBe(true);
+  });
+  it('formats kickoff time in 12-hour Colombian format (not 24h)', () => {
+    const t = fmtTime('2026-06-11T13:00');
+    expect(t).not.toBe('13:00');
+    expect(/\d{1,2}:\d{2}/.test(t)).toBe(true);
+    expect(/m\.?/i.test(t)).toBe(true); // a. m. / p. m.
   });
 });
 

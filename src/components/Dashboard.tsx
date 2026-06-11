@@ -137,7 +137,7 @@ export function DashboardScreen({ user, users, bets, matches, onNavigate }: Dash
                       {m.home} <span style={{ color: '#FFD700' }}>{m.homeScore}–{m.awayScore}</span> {m.away}
                     </div>
                     {bet
-                      ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow',sans-serif" }}>Tu apuesta: {bet.home}–{bet.away}</div>
+                      ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow',sans-serif" }}>Tu apuesta: {bet.kind === 'winner' ? (bet.pick === 'H' ? `Gana ${m.home}` : bet.pick === 'A' ? `Gana ${m.away}` : 'Empate') : `${bet.home}–${bet.away}`}</div>
                       : <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', fontFamily: "'Barlow',sans-serif" }}>Por defecto: 0–0</div>}
                   </div>
                   <span style={{ fontSize: 26 }}>{FLAGS[m.away]}</span>

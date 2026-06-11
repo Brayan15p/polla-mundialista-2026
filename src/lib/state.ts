@@ -10,13 +10,17 @@ export interface User {
   createdAt: string;
 }
 
+import type { BetKind, Outcome } from './data';
+
 export interface Bet {
-  home: number;
+  home: number;          // used for exact-score bets
   away: number;
+  kind?: BetKind;        // 'score' (default) or 'winner'
+  pick?: Outcome;        // 'H' | 'D' | 'A' for winner-only bets
   at?: string;
 }
 
-export type View = 'auth' | 'playerSelect' | 'dashboard' | 'matches' | 'bracket' | 'leaderboard' | 'profile';
+export type View = 'auth' | 'playerSelect' | 'dashboard' | 'matches' | 'mybets' | 'bracket' | 'leaderboard' | 'profile';
 
 export interface AppState {
   users: User[];

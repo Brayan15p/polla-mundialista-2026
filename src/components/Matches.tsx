@@ -335,15 +335,49 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
     .filter(m => activeGroup === 'all' ? true : activeGroup === 'KO' ? !m.group : m.group === activeGroup)
     .filter(m => !myBetsOnly || !!userBets[m.id]);
 
-  const byDay = filtered.reduce<Record<string, Match[]>>((acc, m) => {
-    const day = m.date.split('T')[0];
-    (acc[day] ??= []).push(m); return acc;
-  }, {});
+  // Organize the list according to the active tab:
+  //  · a group tab → by JORNADA 1/2/3, the natural reading order of a group
+  //  · FINALES     → by knockout stage (32avos, Octavos, …)
+  //  · TODOS       → by calendar day (badge with the date)
+  interface Section { key: string; title: string; sub: string; day?: string; matches: Match[] }
+  const fmtDay = (iso: string) =>
+    new Date(iso.split('T')[0] + 'T12:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+
+  const isGroupTab = activeGroup !== 'all' && activeGroup !== 'KO';
+  let sections: Section[];
+  if (isGroupTab) {
+    const byJor: Record<number, Match[]> = {};
+    filtered.forEach(m => { const j = Math.ceil(parseInt(m.id.slice(1)) / 2); (byJor[j] ??= []).push(m); });
+    sections = [1, 2, 3].filter(j => byJor[j]?.length).map(j => ({
+      key: `J${j}`, title: `JORNADA ${j}`,
+      sub: [...new Set(byJor[j].map(m => fmtDay(m.date)))].join(' · '),
+      matches: byJor[j].sort((a, b) => a.date.localeCompare(b.date)),
+    }));
+  } else if (activeGroup === 'KO') {
+    const byStage: Record<string, Match[]> = {};
+    filtered.forEach(m => { (byStage[m.stage || 'Fase final'] ??= []).push(m); });
+    sections = Object.values(byStage).map(ms => {
+      const sorted = [...ms].sort((a, b) => a.date.localeCompare(b.date));
+      const days = [...new Set(sorted.map(m => fmtDay(m.date)))];
+      return {
+        key: sorted[0].stage || 'Fase final',
+        title: (sorted[0].stage || 'Fase final').toUpperCase(),
+        sub: days.length > 1 ? `${days[0]} – ${days[days.length - 1]}` : days[0],
+        matches: sorted,
+      };
+    }).sort((a, b) => a.matches[0].date.localeCompare(b.matches[0].date));
+  } else {
+    const byDay = filtered.reduce<Record<string, Match[]>>((acc, m) => {
+      const day = m.date.split('T')[0];
+      (acc[day] ??= []).push(m); return acc;
+    }, {});
+    sections = Object.entries(byDay).map(([day, ms]) => ({ key: day, title: '', sub: '', day, matches: ms }));
+  }
 
   const totalBets = Object.keys(userBets).length;
   const tabs = [
     { key: 'all', label: 'TODOS' },
-    ...Object.keys(GROUPS).map(k => ({ key: k, label: `GRP ${k}` })),
+    ...Object.keys(GROUPS).map(k => ({ key: k, label: k === 'K' ? 'GRP K 🇨🇴' : `GRP ${k}` })),
     { key: 'KO', label: 'FINALES' },
   ];
 
@@ -374,23 +408,29 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
       </div>
 
       <div style={{ padding: '16px 16px 0', maxWidth: 600, margin: '0 auto' }}>
-        {Object.entries(byDay).map(([day, dayMatches]) => {
-          const date = new Date(day + 'T12:00');
-          const dayNum = date.getDate();
-          const month = date.toLocaleDateString('es-CO', { month: 'short' }).toUpperCase();
-          const weekday = date.toLocaleDateString('es-CO', { weekday: 'long' }).toUpperCase();
+        {sections.map(sec => {
+          const dayMatches = sec.matches;
           const betCount = dayMatches.filter(m => userBets[m.id]).length;
           const allBet = betCount === dayMatches.length;
+          const date = sec.day ? new Date(sec.day + 'T12:00') : null;
 
           return (
-            <div key={day} style={{ marginBottom: 36 }}>
+            <div key={sec.key} style={{ marginBottom: 36 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <div style={{ minWidth: 54, textAlign: 'center', flexShrink: 0, background: 'linear-gradient(135deg,rgba(201,166,44,0.18),rgba(201,166,44,0.06))', border: '1px solid rgba(255,215,0,0.22)', borderRadius: 12, padding: '8px 10px' }}>
-                  <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 28, color: '#FFD700', lineHeight: 1 }}>{dayNum}</div>
-                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 9, color: 'rgba(255,215,0,0.6)', letterSpacing: 2, marginTop: 2 }}>{month}</div>
-                </div>
+                {date ? (
+                  <div style={{ minWidth: 54, textAlign: 'center', flexShrink: 0, background: 'linear-gradient(135deg,rgba(201,166,44,0.18),rgba(201,166,44,0.06))', border: '1px solid rgba(255,215,0,0.22)', borderRadius: 12, padding: '8px 10px' }}>
+                    <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 28, color: '#FFD700', lineHeight: 1 }}>{date.getDate()}</div>
+                    <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 9, color: 'rgba(255,215,0,0.6)', letterSpacing: 2, marginTop: 2 }}>{date.toLocaleDateString('es-CO', { month: 'short' }).toUpperCase()}</div>
+                  </div>
+                ) : (
+                  <div style={{ flexShrink: 0, background: 'linear-gradient(135deg,rgba(201,166,44,0.18),rgba(201,166,44,0.06))', border: '1px solid rgba(255,215,0,0.22)', borderRadius: 12, padding: '10px 14px' }}>
+                    <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 16, color: '#FFD700', lineHeight: 1, letterSpacing: 1 }}>{sec.title}</div>
+                  </div>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 15, color: '#fff', letterSpacing: 2, lineHeight: 1 }}>{weekday}</div>
+                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 15, color: '#fff', letterSpacing: 2, lineHeight: 1 }}>
+                    {date ? date.toLocaleDateString('es-CO', { weekday: 'long' }).toUpperCase() : sec.sub.toUpperCase()}
+                  </div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow',sans-serif", marginTop: 3 }}>
                     {dayMatches.length} {dayMatches.length === 1 ? 'partido' : 'partidos'}
                     {betCount > 0 && <span style={{ color: '#FFD700', marginLeft: 6 }}>· {betCount} apostados</span>}
@@ -439,7 +479,7 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
           );
         })}
 
-        {Object.keys(byDay).length === 0 && (
+        {sections.length === 0 && (
           <div style={{ textAlign: 'center', padding: '70px 20px', color: 'rgba(255,255,255,0.18)' }}>
             <div style={{ fontSize: 52, marginBottom: 14 }}>⚽</div>
             <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 16, letterSpacing: 3 }}>

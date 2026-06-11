@@ -139,13 +139,115 @@ const HOST_VENUES = [
   'Lincoln Financial Field, Filadelfia',
 ];
 
-// Round-robin pairings (team indices) for each of a group's 3 matchdays.
-const ROUND_PAIRS: [number, number][][] = [
-  [[0, 1], [2, 3]], // Jornada 1
-  [[0, 2], [1, 3]], // Jornada 2
-  [[0, 3], [1, 2]], // Jornada 3
-];
-const MATCH_TIMES = ['13:00', '16:00', '19:00'];
+// ── REAL group-stage fixture (official FIFA calendar, Colombia time) ──────
+// Each group lists its 6 matches as [homeIdx, awayIdx, 'MM-DDTHH:MM', venue].
+// IMPORTANT: position n in the array IS match id `${group}${n+1}`, and each
+// id keeps the SAME pairing it always had — (0,1),(2,3),(0,2),(1,3),(0,3),(1,2)
+// — so bets already stored against an id stay attached to the same matchup.
+// Only date/time/venue and home/away orientation were corrected to FIFA's
+// listing. All times are Colombia (UTC-5). When the live API is reachable its
+// schedule replaces this fixture entirely.
+const GROUP_FIXTURES: Record<string, [number, number, string, string][]> = {
+  A: [
+    [0, 1, '06-11T14:00', 'Estadio de la Ciudad de México'],
+    [2, 3, '06-11T21:00', 'Estadio Guadalajara'],
+    [0, 2, '06-18T22:00', 'Estadio Guadalajara'],
+    [3, 1, '06-18T11:00', 'Estadio de Atlanta'],
+    [3, 0, '06-24T20:00', 'Estadio de la Ciudad de México'],
+    [1, 2, '06-24T20:00', 'Estadio Monterrey'],
+  ],
+  B: [
+    [0, 1, '06-12T14:00', 'Estadio de Toronto'],
+    [2, 3, '06-13T14:00', 'Estadio de la Bahía de San Francisco'],
+    [0, 2, '06-18T21:00', 'BC Place Vancouver'],
+    [3, 1, '06-18T18:00', 'Estadio de Los Ángeles'],
+    [3, 0, '06-24T18:00', 'BC Place Vancouver'],
+    [1, 2, '06-24T18:00', 'Estadio de Seattle'],
+  ],
+  C: [
+    [0, 1, '06-13T17:00', 'Estadio de Nueva York/Nueva Jersey'],
+    [2, 3, '06-13T20:00', 'Estadio de Boston'],
+    [0, 2, '06-19T20:30', 'Estadio de Toronto'],
+    [3, 1, '06-19T18:00', 'Estadio de Boston'],
+    [3, 0, '06-24T23:00', 'Estadio de Miami'],
+    [1, 2, '06-24T23:00', 'Estadio de Atlanta'],
+  ],
+  D: [
+    [0, 1, '06-12T20:00', 'Estadio de Los Ángeles'],
+    [2, 3, '06-13T23:00', 'BC Place Vancouver'],
+    [0, 2, '06-19T14:00', 'Estadio de Seattle'],
+    [3, 1, '06-19T21:00', 'Estadio de la Bahía de San Francisco'],
+    [3, 0, '06-26T22:00', 'BC Place Vancouver'],
+    [1, 2, '06-26T22:00', 'Estadio de Houston'],
+  ],
+  E: [
+    [0, 1, '06-20T15:00', 'Estadio de Toronto'],
+    [3, 2, '06-20T19:00', 'Estadio Kansas City'],
+    [0, 2, '06-14T12:00', 'Estadio de Houston'],
+    [1, 3, '06-14T18:00', 'Estadio de Filadelfia'],
+    [3, 0, '06-25T15:00', 'Estadio de Nueva York/Nueva Jersey'],
+    [2, 1, '06-25T15:00', 'Estadio de Boston'],
+  ],
+  F: [
+    [0, 1, '06-14T15:00', 'Estadio de Dallas'],
+    [2, 3, '06-14T21:00', 'Estadio Monterrey'],
+    [0, 2, '06-20T12:00', 'Estadio de Houston'],
+    [3, 1, '06-20T22:00', 'Estadio Monterrey'],
+    [3, 0, '06-25T19:00', 'Estadio de Atlanta'],
+    [1, 2, '06-25T19:00', 'Estadio de Dallas'],
+  ],
+  G: [
+    [0, 1, '06-15T14:00', 'Estadio de Seattle'],
+    [2, 3, '06-15T20:00', 'Estadio de Los Ángeles'],
+    [0, 2, '06-21T18:00', 'Estadio de Los Ángeles'],
+    [3, 1, '06-21T21:00', 'BC Place Vancouver'],
+    [3, 0, '06-26T23:00', 'BC Place Vancouver'],
+    [1, 2, '06-26T23:00', 'Estadio de Seattle'],
+  ],
+  H: [
+    [0, 1, '06-15T11:00', 'Estadio de Atlanta'],
+    [2, 3, '06-15T17:00', 'Estadio de Miami'],
+    [0, 2, '06-21T12:00', 'Estadio de Atlanta'],
+    [3, 1, '06-21T17:00', 'Estadio de Miami'],
+    [3, 0, '06-26T20:00', 'Estadio Guadalajara'],
+    [1, 2, '06-26T20:00', 'Estadio de Houston'],
+  ],
+  I: [
+    [0, 1, '06-16T14:00', 'Estadio de Nueva York/Nueva Jersey'],
+    [2, 3, '06-16T17:00', 'Estadio de Boston'],
+    [0, 2, '06-22T17:00', 'Estadio de Filadelfia'],
+    [3, 1, '06-22T20:00', 'Estadio de Nueva York/Nueva Jersey'],
+    [3, 0, '06-26T15:00', 'Estadio de Boston'],
+    [1, 2, '06-26T15:00', 'Estadio de Toronto'],
+  ],
+  J: [
+    [0, 1, '06-16T20:00', 'Estadio Kansas City'],
+    [2, 3, '06-16T23:00', 'Estadio de la Bahía de San Francisco'],
+    [0, 2, '06-22T18:00', 'Estadio de Dallas'],
+    [3, 1, '06-22T21:00', 'Estadio de la Bahía de San Francisco'],
+    [3, 0, '06-27T22:00', 'Estadio de la Bahía de San Francisco'],
+    [1, 2, '06-27T22:00', 'Estadio de Dallas'],
+  ],
+  K: [
+    [0, 1, '06-17T12:00', 'Estadio de Houston'],
+    [2, 3, '06-17T21:00', 'Estadio de la Ciudad de México'],
+    [0, 2, '06-23T18:00', 'Estadio Guadalajara'],
+    [3, 1, '06-23T21:00', 'Estadio de la Ciudad de México'],
+    [3, 0, '06-27T19:30', 'Estadio de Miami'],
+    [1, 2, '06-27T19:30', 'Estadio de Atlanta'],
+  ],
+  // Group L: the source listing had a copy-paste error here, so days follow its
+  // notes (opens 17 jun with two Europeans; Croatia–Ghana closes on 27 jun) and
+  // hours are estimates within the official windows.
+  L: [
+    [0, 1, '06-17T15:00', 'Estadio de Boston'],
+    [2, 3, '06-17T18:00', 'Estadio de Filadelfia'],
+    [0, 2, '06-23T13:00', 'Estadio de Houston'],
+    [3, 1, '06-23T22:00', 'Estadio Guadalajara'],
+    [0, 3, '06-27T17:00', 'Estadio de Seattle'],
+    [1, 2, '06-27T17:00', 'BC Place Vancouver'],
+  ],
+};
 
 // Build the complete group-stage fixture: 12 groups × 6 matches = 72 games.
 // Every match ships as `upcoming` with NO score — real results come only from
@@ -153,21 +255,16 @@ const MATCH_TIMES = ['13:00', '16:00', '19:00'];
 // scores for games that haven't been played.
 function buildGroupStage(): Match[] {
   const out: Match[] = [];
-  let venueIdx = 0;
-  Object.entries(GROUPS).forEach(([gKey, g], gIdx) => {
-    ROUND_PAIRS.forEach((pairs, round) => {
-      pairs.forEach((pair, p) => {
-        const day = 11 + round * 5 + (gIdx % 5); // June 11–25, 2026
-        const time = MATCH_TIMES[(gIdx + p) % MATCH_TIMES.length];
-        out.push({
-          id: `${gKey}${round * 2 + p + 1}`,
-          group: gKey,
-          home: g.teams[pair[0]],
-          away: g.teams[pair[1]],
-          date: `2026-06-${String(day).padStart(2, '0')}T${time}`,
-          venue: HOST_VENUES[venueIdx++ % HOST_VENUES.length],
-          status: 'upcoming',
-        });
+  Object.entries(GROUPS).forEach(([gKey, g]) => {
+    (GROUP_FIXTURES[gKey] || []).forEach(([h, a, dt, venue], i) => {
+      out.push({
+        id: `${gKey}${i + 1}`,
+        group: gKey,
+        home: g.teams[h],
+        away: g.teams[a],
+        date: `2026-${dt}`,
+        venue,
+        status: 'upcoming',
       });
     });
   });

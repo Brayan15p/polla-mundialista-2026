@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePoints, pointsFor, canBet, winProbability, teamsKnown, fmtTime, MATCHES, TBD, type Match } from './data';
+import { calculatePoints, pointsFor, canBet, winProbability, teamsKnown, fmtTime, MATCHES, GROUPS, TBD, type Match } from './data';
 import { groupStandings } from './standings';
 
 describe('calculatePoints', () => {
@@ -70,6 +70,39 @@ describe('fixture integrity', () => {
     expect(t).not.toBe('13:00');
     expect(/\d{1,2}:\d{2}/.test(t)).toBe(true);
     expect(/m\.?/i.test(t)).toBe(true); // a. m. / p. m.
+  });
+});
+
+describe('fixture — official FIFA dates (Colombia time)', () => {
+  const byId = Object.fromEntries(MATCHES.map(m => [m.id, m]));
+  it('opens with México vs Sudáfrica on 11 jun, 2:00 p.m., CDMX', () => {
+    const m = byId['A1'];
+    expect(m.home).toBe('Mexico');
+    expect(m.away).toBe('South Africa');
+    expect(m.date).toBe('2026-06-11T14:00');
+    expect(m.venue).toContain('Ciudad de México');
+  });
+  it('Colombia vs Portugal closes group K on 27 jun, 7:30 p.m., Miami', () => {
+    const m = byId['K5'];
+    expect(m.home).toBe('Colombia');
+    expect(m.away).toBe('Portugal');
+    expect(m.date).toBe('2026-06-27T19:30');
+    expect(m.venue).toContain('Miami');
+  });
+  it('group stage runs 11–27 jun; knockout starts 28 jun', () => {
+    const group = MATCHES.filter(m => m.group);
+    expect(group.every(m => m.date >= '2026-06-11' && m.date < '2026-06-28')).toBe(true);
+    const ko = MATCHES.filter(m => !m.group);
+    expect(ko.every(m => m.date >= '2026-06-28')).toBe(true);
+  });
+  it('each id keeps its historical pairing so saved bets stay attached', () => {
+    // id n ↔ pairing: 1:(0,1) 2:(2,3) 3:(0,2) 4:(1,3) 5:(0,3) 6:(1,2)
+    const PAIRS: [number, number][] = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+    for (const m of MATCHES.filter(m => m.group)) {
+      const g = GROUPS[m.group].teams;
+      const [x, y] = PAIRS[parseInt(m.id.slice(1)) - 1];
+      expect([m.home, m.away].sort()).toEqual([g[x], g[y]].sort());
+    }
   });
 });
 

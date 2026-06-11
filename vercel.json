@@ -3,5 +3,8 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/football/:path*", "destination": "https://api.football-data.org/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

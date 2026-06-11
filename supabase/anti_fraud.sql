@@ -25,13 +25,17 @@ create policy "matches admin" on public.matches for all
   with check (auth.uid() = '00000000-0000-0000-0000-000000000000');
 
 -- Reject any bet placed within 5 minutes of (or after) kickoff.
+-- Permissive when matches haven't been synced yet: bets go through so people
+-- can play before the admin syncs. Once a kickoff row exists, the 5-min
+-- deadline is enforced server-side.
 create or replace function public.check_bet_deadline()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare ko timestamptz;
 begin
   select kickoff into ko from public.matches where id = new.match_id;
+  -- No kickoff row yet → allow (deadline enforced after admin syncs).
   if ko is null then
-    raise exception 'Partido no sincronizado (%). El admin debe sincronizar los partidos.', new.match_id;
+    return new;
   end if;
   if now() >= ko - interval '5 minutes' then
     raise exception 'Apuestas cerradas: faltan menos de 5 minutos para el partido.';

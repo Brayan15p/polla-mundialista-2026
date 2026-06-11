@@ -15,11 +15,11 @@ interface ProfileRow {
   created_at: string;
 }
 
-function toUser(p: ProfileRow): User {
+function toUser(p: ProfileRow, email = ''): User {
   return {
     id: p.id,
     username: p.username,
-    email: '',          // auth owns the email/password; not duplicated here
+    email,
     password: '',
     playerId: p.player_id,
     poolJoined: p.pool_joined,
@@ -45,7 +45,7 @@ export async function cloudSignUp(
   if (error) return { error: error.message };
   if (!data.session) return { needsConfirm: true }; // email confirmation is ON
   const profile = await ensureProfile(data.user, username, joinPool);
-  return { user: profile ?? { id: data.user!.id, username, email: '', password: '', playerId: null, poolJoined: joinPool, createdAt: new Date().toISOString() } };
+  return { user: profile ?? { id: data.user!.id, username, email, password: '', playerId: null, poolJoined: joinPool, createdAt: new Date().toISOString() } };
 }
 
 export async function cloudSignIn(
@@ -95,10 +95,10 @@ export async function cloudCurrentUser(): Promise<User | null> {
   return await ensureProfile(data.user);
 }
 
-async function fetchProfile(id: string): Promise<User | null> {
+async function fetchProfile(id: string, email = ''): Promise<User | null> {
   if (!supabase) return null;
   const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
-  return data ? toUser(data as ProfileRow) : null;
+  return data ? toUser(data as ProfileRow, email) : null;
 }
 
 // Return the player's profile, creating it on the fly if it's missing — this
@@ -109,7 +109,8 @@ async function ensureProfile(
   username?: string, poolJoined?: boolean,
 ): Promise<User | null> {
   if (!supabase || !authUser) return null;
-  const existing = await fetchProfile(authUser.id);
+  const email = authUser.email ?? '';
+  const existing = await fetchProfile(authUser.id, email);
   if (existing) return existing;
 
   const meta = authUser.user_metadata || {};
@@ -120,9 +121,9 @@ async function ensureProfile(
     .insert({ id: authUser.id, username: name, pool_joined: pool })
     .select('*')
     .maybeSingle();
-  if (data) return toUser(data as ProfileRow);
+  if (data) return toUser(data as ProfileRow, email);
   // Insert may have raced with the trigger — read once more.
-  return await fetchProfile(authUser.id);
+  return await fetchProfile(authUser.id, email);
 }
 
 // ── Writes ──────────────────────────────────────────────────────────────
@@ -181,7 +182,7 @@ export async function cloudLoadAll(): Promise<CloudData> {
   if (betsRes.error) console.error('[cloud] bets read error:', betsRes.error.message);
   if (resultsRes.error) console.error('[cloud] results read error:', resultsRes.error.message);
 
-  const users = (profilesRes.data as ProfileRow[] | null)?.map(toUser) ?? [];
+  const users = (profilesRes.data as ProfileRow[] | null)?.map(p => toUser(p)) ?? [];
 
   const bets: CloudData['bets'] = {};
   for (const b of (betsRes.data ?? []) as { user_id: string; match_id: string; home: number; away: number; kind?: string; pick?: string }[]) {

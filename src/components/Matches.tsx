@@ -346,12 +346,15 @@ export function MatchesScreen({ user, bets, users, matches, onBet }: MatchesScre
   const isGroupTab = activeGroup !== 'all' && activeGroup !== 'KO';
   let sections: Section[];
   if (isGroupTab) {
-    const byJor: Record<number, Match[]> = {};
-    filtered.forEach(m => { const j = Math.ceil(parseInt(m.id.slice(1)) / 2); (byJor[j] ??= []).push(m); });
-    sections = [1, 2, 3].filter(j => byJor[j]?.length).map(j => ({
-      key: `J${j}`, title: `JORNADA ${j}`,
-      sub: [...new Set(byJor[j].map(m => fmtDay(m.date)))].join(' · '),
-      matches: byJor[j].sort((a, b) => a.date.localeCompare(b.date)),
+    // Group by matchday using actual dates (not IDs) — FIFA sometimes
+    // schedules pairings out of the standard 1-2-3 order (e.g. Group E).
+    const byDay: Record<string, Match[]> = {};
+    filtered.forEach(m => { const d = m.date.split('T')[0]; (byDay[d] ??= []).push(m); });
+    const days = Object.keys(byDay).sort();
+    sections = days.map((d, i) => ({
+      key: `J${i + 1}`, title: `JORNADA ${i + 1}`,
+      sub: fmtDay(d + 'T12:00'),
+      matches: byDay[d].sort((a, b) => a.date.localeCompare(b.date)),
     }));
   } else if (activeGroup === 'KO') {
     const byStage: Record<string, Match[]> = {};

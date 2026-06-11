@@ -6,6 +6,7 @@
 
 import { supabase } from './supabase';
 import type { User, Bet } from './state';
+import type { Match } from './data';
 
 interface ProfileRow {
   id: string;
@@ -158,11 +159,22 @@ export async function cloudUpdateResult(matchId: string, home: number, away: num
   );
 }
 
-// Push kickoff times to the `matches` table (admin only) so the server-side
+// Push full match data to the `matches` table (admin only) so the server-side
 // anti-fraud trigger can enforce the betting deadline. See supabase/anti_fraud.sql.
-export async function cloudSyncMatches(matches: { id: string; date: string }[]): Promise<{ error?: string }> {
+export async function cloudSyncMatches(matches: Match[]): Promise<{ error?: string }> {
   if (!supabase) return { error: 'Supabase no configurado' };
-  const rows = matches.map(m => ({ id: m.id, kickoff: m.date }));
+  const rows = matches.map(m => ({
+    id: m.id,
+    home_team: m.home,
+    away_team: m.away,
+    group_key: m.group || null,
+    stage: m.stage || null,
+    kickoff: m.date,
+    venue: m.venue,
+    home_score: m.homeScore ?? null,
+    away_score: m.awayScore ?? null,
+    status: m.status,
+  }));
   const { error } = await supabase.from('matches').upsert(rows, { onConflict: 'id' });
   return { error: error?.message };
 }

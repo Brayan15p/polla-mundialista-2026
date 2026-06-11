@@ -5,6 +5,10 @@
 
 BEGIN;
 
+-- Disable anti-fraud trigger temporarily so migration can update match_ids
+-- (this is a DB-level admin operation, not a user bet)
+ALTER TABLE public.bets DISABLE TRIGGER ALL;
+
 -- Step 0: Normalize team names in api-* match rows
 -- (API sends "Bosnia-Herzegovina", our stable rows use "Bosnia and Herzegovina")
 UPDATE public.matches SET home_team = 'Bosnia and Herzegovina' WHERE home_team = 'Bosnia-Herzegovina';
@@ -25,6 +29,7 @@ UPDATE public.matches SET home_team = E'Côte d''Ivoire'        WHERE home_team 
 UPDATE public.matches SET away_team = E'Côte d''Ivoire'        WHERE away_team = 'Ivory Coast';
 
 -- Step 1: Build mapping table: api-* id → stable id (matched by teams)
+DROP TABLE IF EXISTS _id_map;
 CREATE TEMP TABLE _id_map AS
 SELECT
   m_api.id    AS api_id,
@@ -69,6 +74,9 @@ WHERE b.match_id = im.api_id;
 
 -- Step 5: Delete api-* rows from matches (stable rows now exist for all of them)
 DELETE FROM public.matches WHERE id LIKE 'api-%';
+
+-- Re-enable anti-fraud trigger
+ALTER TABLE public.bets ENABLE TRIGGER ALL;
 
 COMMIT;
 

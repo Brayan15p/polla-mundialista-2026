@@ -71,3 +71,35 @@ export function loadState(): AppState {
 export function saveState(state: AppState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
+// ── Cloud-mode redundancy cache ───────────────────────────────────────────
+// In cloud mode Supabase is the source of truth, but we ALSO mirror the shared
+// data (bets/results/users) to localStorage. This is what makes a player's
+// entered score survive a page refresh and a momentary cloud read failure: on
+// boot we hydrate instantly from this cache, then reconcile with the cloud.
+// Nothing here ever deletes data — it only adds a local backup layer.
+const CLOUD_CACHE_KEY = 'pollaWC2026_cloudcache_v1';
+
+export interface CloudCache {
+  users: User[];
+  bets: Record<string, Record<string, Bet>>;
+  matchResults: Record<string, { home: number; away: number }>;
+}
+
+export function loadCloudCache(): CloudCache {
+  try {
+    const s = localStorage.getItem(CLOUD_CACHE_KEY);
+    if (s) return JSON.parse(s) as CloudCache;
+  } catch {
+    /* ignore */
+  }
+  return { users: [], bets: {}, matchResults: {} };
+}
+
+export function saveCloudCache(c: CloudCache): void {
+  try {
+    localStorage.setItem(CLOUD_CACHE_KEY, JSON.stringify(c));
+  } catch {
+    /* ignore */
+  }
+}

@@ -301,33 +301,50 @@ function buildGroupStage(): Match[] {
 // Knockout bracket: 16 + 8 + 4 + 2 + 1 (3rd place) + 1 (final) = 32 matches.
 // Teams are "Por definir" until the group stage / previous round decides them;
 // betting stays locked on a match until both rivals are known (teamsKnown).
-const KNOCKOUT_SPEC: { stage: string; count: number; day: number; times: string[] }[] = [
-  { stage: '32avos',  count: 16, day: 28, times: ['12:00', '15:00', '18:00'] }, // 28 jun – 3 jul
-  { stage: 'Octavos', count: 8,  day: 4,  times: ['14:00', '18:00'] },          // 4 – 7 jul (month +1)
-  { stage: 'Cuartos', count: 4,  day: 9,  times: ['15:00', '19:00'] },          // 9 – 11 jul
-  { stage: 'Semifinal', count: 2, day: 14, times: ['18:00'] },                  // 14 – 15 jul
-  { stage: 'Tercer puesto', count: 1, day: 18, times: ['15:00'] },              // 18 jul
-  { stage: 'Final',   count: 1,  day: 19, times: ['15:00'] },                   // 19 jul
+// `base` is the FIFA match number of the round's first tie (see bracket.ts
+// MATCHNO_TO_ID): 32avos→73, Octavos→89, Cuartos→97, SF→101, 3rd→103, Final→104.
+const KNOCKOUT_SPEC: { stage: string; count: number; base: number }[] = [
+  { stage: '32avos',        count: 16, base: 73 },
+  { stage: 'Octavos',       count: 8,  base: 89 },
+  { stage: 'Cuartos',       count: 4,  base: 97 },
+  { stage: 'Semifinal',     count: 2,  base: 101 },
+  { stage: 'Tercer puesto', count: 1,  base: 103 },
+  { stage: 'Final',         count: 1,  base: 104 },
 ];
+
+// Official FIFA World Cup 2026 knockout calendar, by FIFA match number, already
+// normalised to Colombia time (America/Bogotá, UTC-5, no DST). Source schedule is
+// published in UTC; each kickoff below is UTC − 5h. This is the REAL calendar
+// (e.g. 28-jun has a single tie, match 73), not an even 3-per-day approximation.
+const KO_DATES: Record<number, string> = {
+  73: '2026-06-28T14:00',
+  74: '2026-06-29T15:30', 75: '2026-06-29T16:00', 76: '2026-06-29T12:00',
+  77: '2026-06-30T16:00', 78: '2026-06-30T12:00', 79: '2026-06-30T20:00',
+  80: '2026-07-01T11:00', 81: '2026-07-01T15:00', 82: '2026-07-01T15:00',
+  83: '2026-07-02T14:00', 84: '2026-07-02T14:00', 85: '2026-07-02T22:00',
+  86: '2026-07-03T17:00', 87: '2026-07-03T19:30', 88: '2026-07-03T14:00',
+  89: '2026-07-04T16:00', 90: '2026-07-04T12:00',
+  91: '2026-07-05T15:00', 92: '2026-07-05T20:00',
+  93: '2026-07-06T14:00', 94: '2026-07-06T19:00',
+  95: '2026-07-07T11:00', 96: '2026-07-07T15:00',
+  97: '2026-07-09T15:00', 98: '2026-07-10T14:00',
+  99: '2026-07-11T16:00', 100: '2026-07-11T20:00',
+  101: '2026-07-14T13:00', 102: '2026-07-15T14:00',
+  103: '2026-07-18T16:00', 104: '2026-07-19T14:00',
+};
 
 function buildKnockout(): Match[] {
   const out: Match[] = [];
   let venueIdx = 5;
   KNOCKOUT_SPEC.forEach(spec => {
-    const isJune = spec.stage === '32avos';
     for (let i = 0; i < spec.count; i++) {
-      const dayOffset = Math.floor(i / spec.times.length);
-      const day = spec.day + dayOffset;
-      const month = isJune && day <= 30 ? '06' : '07';
-      const realDay = isJune && day > 30 ? day - 30 : day;
-      const time = spec.times[i % spec.times.length];
       out.push({
         id: `KO-${spec.stage}-${i + 1}`,
         group: '',
         stage: spec.stage,
         home: TBD,
         away: TBD,
-        date: `2026-${month}-${String(realDay).padStart(2, '0')}T${time}`,
+        date: KO_DATES[spec.base + i],
         venue: HOST_VENUES[venueIdx++ % HOST_VENUES.length],
         status: 'upcoming',
       });

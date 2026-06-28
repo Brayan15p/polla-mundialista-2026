@@ -208,6 +208,19 @@ export function resolveKnockout(matches: Match[]): Match[] {
   }
   const absorbed = new Set<string>();
 
+  // Real knockout pairings from the API, indexed by each team (incl. ties not yet
+  // played, no score). The home side of every R32 slot is a group winner/runner-up
+  // and is reliable; our third-place assignment may differ from the OFFICIAL draw,
+  // so when the API knows the real opponent for a slot's anchor team we adopt it.
+  const apiKoByTeam = new Map<string, Match>();
+  for (const m of matches) {
+    if (koIds.has(m.id)) continue;
+    if (m.group && m.group !== '?') continue;
+    if (!m.home || !m.away || m.home === TBD || m.away === TBD) continue;
+    apiKoByTeam.set(m.home, m);
+    apiKoByTeam.set(m.away, m);
+  }
+
   const thirdTeam = (slot: number): string => {
     const g = q.thirdGroupBySlot[slot];
     return g ? (q.standings[g]?.[2]?.team ?? TBD) : TBD;
@@ -235,6 +248,15 @@ export function resolveKnockout(matches: Match[]): Match[] {
     if (!base) continue;
     const [hs, as] = mn <= 88 ? R32_SEED[mn] : FEEDS[mn];
     let m: Match = { ...base, home: source(hs), away: source(as) };
+    // R32 only: trust the API for the real opponent of this slot's anchor (home)
+    // team, overriding a third-place guess that doesn't match the official draw.
+    if (mn <= 88 && m.home !== TBD) {
+      const real = apiKoByTeam.get(m.home);
+      if (real) {
+        const realAway = real.home === m.home ? real.away : real.home;
+        if (realAway && realAway !== TBD && realAway !== m.home) m = { ...m, away: realAway };
+      }
+    }
     // Graft a live API result onto a still-open slot whose teams are now known,
     // re-orienting the score if the API lists the pair the other way around.
     if (m.status !== 'finished' && m.home !== TBD && m.away !== TBD) {

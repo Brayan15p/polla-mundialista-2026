@@ -18,6 +18,7 @@ const NAME_MAP: Record<string, string> = {
   'Congo': 'Congo DR',
   'DR Congo': 'Congo DR',
   'Cape Verde': 'Cabo Verde',
+  'Cape Verde Islands': 'Cabo Verde',
   'Turkey': 'Türkiye',
   'Curacao': 'Curaçao',
   'Bosnia & Herzegovina': 'Bosnia and Herzegovina',
@@ -121,7 +122,10 @@ export function mergeLiveOntoFixture(raw: RawMatch[]): Match[] {
   const loose = live.filter(lm =>
     !fixtureIds.has(lm.id) &&
     lm.home !== TBD && lm.away !== TBD && !!lm.home && !!lm.away &&
-    (lm.status === 'finished' || lm.status === 'live'),
+    // finished/live from any stage, plus UPCOMING knockout ties (group === '?')
+    // so resolveKnockout can show the real matchups before they're played.
+    (lm.status === 'finished' || lm.status === 'live' ||
+     (lm.status === 'upcoming' && lm.group === '?')),
   );
   return [...merged, ...loose];
 }

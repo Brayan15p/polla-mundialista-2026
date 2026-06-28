@@ -6,7 +6,7 @@
 
 import { supabase } from './supabase';
 import type { User, Bet, MatchResult } from './state';
-import { toInstant, type Match } from './data';
+import { toInstant, MATCHES, type Match } from './data';
 
 interface ProfileRow {
   id: string;
@@ -319,6 +319,31 @@ export async function cloudDiagnose(): Promise<string[]> {
   if (mErr) lines.push(`⚠️ Tabla matches (anti-fraud): ${mErr.message}`);
   else if (!mData || mData.length === 0) lines.push('⚠️ Tabla matches vacía — anti-fraude no bloqueará, pero las apuestas sí guardarán');
   else lines.push('✅ Tabla matches con datos (anti-fraude activo)');
+
+  // 7. Bets coverage — diagnoses "0/N apostaron" when people DID bet.
+  //    Two failure modes this catches:
+  //      a) only 1 distinct user has readable bets → the "bets read" RLS policy
+  //         is restricting reads to your own bets (should be `using (true)`).
+  //      b) bets point to match_ids that no longer exist in the fixture → those
+  //         bets can't show on any match card (an id mismatch).
+  const { data: allBets, error: abErr } = await supabase.from('bets').select('user_id, match_id');
+  if (abErr) {
+    lines.push(`❌ Cobertura de apuestas: ${abErr.message}`);
+  } else if (allBets) {
+    const usersWithBets = new Set(allBets.map(b => b.user_id));
+    const matchIds = new Set(allBets.map(b => b.match_id));
+    const fixtureIds = new Set(MATCHES.map(m => m.id));
+    const orphans = [...matchIds].filter(id => id !== '__diag_test__' && !fixtureIds.has(id));
+    lines.push(`📊 Apuestas: ${allBets.length} en total · ${usersWithBets.size} usuario(s) con apuestas`);
+    if (usersWithBets.size <= 1 && allBets.length > 0)
+      lines.push('   ⚠️ Solo se leen TUS apuestas → la política RLS "bets read" no es pública. Re-corre en SQL: create policy "bets read" on public.bets for select using (true);');
+    if (orphans.length) {
+      lines.push(`   ⚠️ ${orphans.length} apuesta(s) apuntan a partidos con un id que ya NO existe (por eso salen como "sin apostar"):`);
+      orphans.slice(0, 8).forEach(id => lines.push(`      • ${id}`));
+    } else {
+      lines.push('   ✅ Todos los match_id de las apuestas existen en el fixture actual');
+    }
+  }
 
   return lines;
 }

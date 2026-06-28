@@ -5,14 +5,17 @@ import { cloudDiagnose } from '../lib/cloud';
 interface AdminScreenProps {
   matches: Match[];
   onClose: () => void;
-  onUpdateResult: (matchId: string, home: number, away: number) => void;
+  onUpdateResult: (matchId: string, home: number, away: number, homePens?: number, awayPens?: number) => void;
   onSyncMatches?: () => Promise<{ error?: string }>;
   onExport?: () => void;
 }
 
 export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches, onExport }: AdminScreenProps) {
-  const [vals, setVals] = useState<Record<string, { home: string; away: string }>>(
-    Object.fromEntries(matches.map(m => [m.id, { home: m.homeScore?.toString() ?? '', away: m.awayScore?.toString() ?? '' }]))
+  const [vals, setVals] = useState<Record<string, { home: string; away: string; hp?: string; ap?: string }>>(
+    Object.fromEntries(matches.map(m => [m.id, {
+      home: m.homeScore?.toString() ?? '', away: m.awayScore?.toString() ?? '',
+      hp: m.homePens?.toString() ?? '', ap: m.awayPens?.toString() ?? '',
+    }]))
   );
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [syncMsg, setSyncMsg] = useState('');
@@ -28,9 +31,18 @@ export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches, o
   };
 
   const save = (id: string) => {
-    const h = parseInt(vals[id].home), a = parseInt(vals[id].away);
+    const v = vals[id];
+    const h = parseInt(v.home), a = parseInt(v.away);
     if (isNaN(h) || isNaN(a)) return;
-    onUpdateResult(id, h, a);
+    // A knockout tie level after 90' is decided on penalties; capture them so the
+    // bracket can advance the right team. Ignored for non-draws / group games.
+    const m = matches.find(x => x.id === id);
+    let hp: number | undefined, ap: number | undefined;
+    if (m?.stage && h === a) {
+      const ph = parseInt(v.hp ?? ''), pa = parseInt(v.ap ?? '');
+      if (!isNaN(ph) && !isNaN(pa)) { hp = ph; ap = pa; }
+    }
+    onUpdateResult(id, h, a, hp, ap);
     setSaved(p => ({ ...p, [id]: true }));
     setTimeout(() => setSaved(p => ({ ...p, [id]: false })), 2200);
   };
@@ -93,8 +105,12 @@ export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches, o
         </div>
 
         {matches.map(m => {
-          const v = vals[m.id] || { home: '', away: '' };
+          const v = vals[m.id] || { home: '', away: '', hp: '', ap: '' };
           const inpS: CSSProperties = { width: 52, height: 48, textAlign: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,215,0,0.3)', borderRadius: 8, color: '#FFD700', fontFamily: "'Anton',sans-serif", fontSize: 26, outline: 'none' };
+          const penInpS: CSSProperties = { width: 40, height: 36, textAlign: 'center', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(96,165,250,0.4)', borderRadius: 7, color: '#93C5FD', fontFamily: "'Anton',sans-serif", fontSize: 18, outline: 'none' };
+          // Penalty inputs appear only for a knockout tie entered as a draw.
+          const h = parseInt(v.home), a = parseInt(v.away);
+          const koDraw = !!m.stage && !isNaN(h) && !isNaN(a) && h === a;
           return (
             <div key={m.id} style={{
               background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
@@ -106,18 +122,28 @@ export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches, o
                   {FLAGS[m.home]} {m.home} vs {m.away} {FLAGS[m.away]}
                 </div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
-                  {m.group && `Grupo ${m.group} · `}{m.status} · {m.date.split('T')[0]}
+                  {m.group && `Grupo ${m.group} · `}{m.stage && `${m.stage} · `}{m.status} · {m.date.split('T')[0]}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                <input type="number" min="0" max="20" value={v.home} onChange={e => setVals(p => ({ ...p, [m.id]: { ...v, home: e.target.value } }))} style={inpS} />
-                <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'Anton',sans-serif", fontSize: 22 }}>–</span>
-                <input type="number" min="0" max="20" value={v.away} onChange={e => setVals(p => ({ ...p, [m.id]: { ...v, away: e.target.value } }))} style={inpS} />
-                <button onClick={() => save(m.id)} style={{
-                  padding: '10px 14px', background: saved[m.id] ? '#22C55E' : '#FFD700',
-                  border: 'none', borderRadius: 8, color: '#000',
-                  fontFamily: "'Anton',sans-serif", fontSize: 14, cursor: 'pointer', transition: 'background 0.3s',
-                }}>{saved[m.id] ? '✓' : 'OK'}</button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="number" min="0" max="20" value={v.home} onChange={e => setVals(p => ({ ...p, [m.id]: { ...v, home: e.target.value } }))} style={inpS} />
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'Anton',sans-serif", fontSize: 22 }}>–</span>
+                  <input type="number" min="0" max="20" value={v.away} onChange={e => setVals(p => ({ ...p, [m.id]: { ...v, away: e.target.value } }))} style={inpS} />
+                  <button onClick={() => save(m.id)} style={{
+                    padding: '10px 14px', background: saved[m.id] ? '#22C55E' : '#FFD700',
+                    border: 'none', borderRadius: 8, color: '#000',
+                    fontFamily: "'Anton',sans-serif", fontSize: 14, cursor: 'pointer', transition: 'background 0.3s',
+                  }}>{saved[m.id] ? '✓' : 'OK'}</button>
+                </div>
+                {koDraw && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 11, color: '#60A5FA', letterSpacing: 1 }}>PENALES</span>
+                    <input type="number" min="0" max="30" placeholder="0" value={v.hp ?? ''} onChange={e => setVals(p => ({ ...p, [m.id]: { ...v, hp: e.target.value } }))} style={penInpS} />
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontFamily: "'Anton',sans-serif", fontSize: 16 }}>–</span>
+                    <input type="number" min="0" max="30" placeholder="0" value={v.ap ?? ''} onChange={e => setVals(p => ({ ...p, [m.id]: { ...v, ap: e.target.value } }))} style={penInpS} />
+                  </div>
+                )}
               </div>
             </div>
           );

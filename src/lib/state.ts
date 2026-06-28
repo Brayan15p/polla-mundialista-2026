@@ -31,13 +31,22 @@ export interface Bet {
   at?: string;
 }
 
+// A real (admin/API) result. Penalties are only meaningful for a knockout tie
+// that is level after 90' — they decide who advances, not the bet points.
+export interface MatchResult {
+  home: number;
+  away: number;
+  homePens?: number;
+  awayPens?: number;
+}
+
 export type View = 'auth' | 'playerSelect' | 'dashboard' | 'matches' | 'mybets' | 'bracket' | 'leaderboard' | 'profile';
 
 export interface AppState {
   users: User[];
   currentUser: User | null;
   bets: Record<string, Record<string, Bet>>;
-  matchResults: Record<string, { home: number; away: number }>;
+  matchResults: Record<string, MatchResult>;
   view: View;
   showAdmin: boolean;
 }
@@ -83,7 +92,7 @@ const CLOUD_CACHE_KEY = 'pollaWC2026_cloudcache_v1';
 export interface CloudCache {
   users: User[];
   bets: Record<string, Record<string, Bet>>;
-  matchResults: Record<string, { home: number; away: number }>;
+  matchResults: Record<string, MatchResult>;
 }
 
 export function loadCloudCache(): CloudCache {

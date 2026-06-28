@@ -124,7 +124,7 @@ export default function App() {
   const matches = useMemo(() => {
     const merged = baseMatches.map(m => {
       const r = state.matchResults[m.id];
-      return r ? { ...m, homeScore: r.home, awayScore: r.away, status: 'finished' as const } : m;
+      return r ? { ...m, homeScore: r.home, awayScore: r.away, homePens: r.homePens, awayPens: r.awayPens, status: 'finished' as const } : m;
     });
     return resolveKnockout(merged);
   }, [baseMatches, state.matchResults]);
@@ -245,9 +245,9 @@ export default function App() {
     }
   };
 
-  const updateResult = (matchId: string, home: number, away: number) => {
-    if (supabaseEnabled) cloudUpdateResult(matchId, home, away);
-    setState(p => ({ ...p, matchResults: { ...p.matchResults, [matchId]: { home, away } } }));
+  const updateResult = (matchId: string, home: number, away: number, homePens?: number, awayPens?: number) => {
+    if (supabaseEnabled) cloudUpdateResult(matchId, home, away, homePens, awayPens);
+    setState(p => ({ ...p, matchResults: { ...p.matchResults, [matchId]: { home, away, homePens, awayPens } } }));
   };
 
   const logout = () => {

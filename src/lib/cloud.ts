@@ -6,7 +6,7 @@
 
 import { supabase } from './supabase';
 import type { User, Bet, MatchResult } from './state';
-import type { Match } from './data';
+import { toInstant, type Match } from './data';
 
 interface ProfileRow {
   id: string;
@@ -177,7 +177,11 @@ export async function cloudSyncMatches(matches: Match[]): Promise<{ error?: stri
     away_team: m.away,
     group_key: m.group || null,
     stage: m.stage || null,
-    kickoff: m.date,
+    // Fixture dates are naive Colombia-local strings ("2026-06-28T14:00"). Send
+    // them as an explicit UTC instant so the timestamptz column doesn't get
+    // misread as UTC by Postgres — otherwise the anti-fraud deadline lands 5h
+    // early and blocks betting hours before the real kickoff.
+    kickoff: toInstant(m.date).toISOString(),
     venue: m.venue,
     home_score: m.homeScore ?? null,
     away_score: m.awayScore ?? null,

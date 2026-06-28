@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { MATCHES } from './data';
+import { MATCHES, toInstant } from './data';
+
+// The anti-fraud deadline lives in Postgres (timestamptz). Fixture dates are
+// naive Colombia-local strings, so they MUST be converted to an explicit UTC
+// instant before syncing — otherwise the server reads them 5h early and blocks
+// betting hours before kickoff. This pins the conversion contract.
+describe('kickoff is converted to a UTC instant for the anti-fraud deadline', () => {
+  it('treats a naive fixture date as Colombia time (UTC-5)', () => {
+    // Today's R32 opener: 14:00 Colombia must be 19:00Z, not 14:00Z.
+    expect(toInstant('2026-06-28T14:00').toISOString()).toBe('2026-06-28T19:00:00.000Z');
+  });
+  it('keeps an already zoned timestamp untouched', () => {
+    expect(toInstant('2026-06-28T19:00:00.000Z').toISOString()).toBe('2026-06-28T19:00:00.000Z');
+  });
+});
 
 // Content-based verification of the REAL fixture (order-independent): every
 // match from the official listing must exist exactly once with the right

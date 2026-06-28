@@ -5,7 +5,7 @@
 // Level Security; this module only ever uses the anon key.
 
 import { supabase } from './supabase';
-import type { User, Bet } from './state';
+import type { User, Bet, MatchResult } from './state';
 import type { Match } from './data';
 
 interface ProfileRow {
@@ -32,7 +32,7 @@ function toUser(p: ProfileRow, email = ''): User {
 export interface CloudData {
   users: User[];
   bets: Record<string, Record<string, Bet>>;
-  matchResults: Record<string, { home: number; away: number }>;
+  matchResults: Record<string, MatchResult>;
   // Per-table read success. The caller MUST only overwrite a slice of state when
   // its flag is true — otherwise a momentary read failure would blank the UI
   // even though the data is safe in the database.
@@ -156,9 +156,13 @@ export async function cloudPlaceBet(
   return { error: msg || 'No se pudo guardar la apuesta.' };
 }
 
-export async function cloudUpdateResult(matchId: string, home: number, away: number): Promise<void> {
+export async function cloudUpdateResult(
+  matchId: string, home: number, away: number, homePens?: number, awayPens?: number,
+): Promise<void> {
   await supabase?.from('match_results').upsert(
-    { match_id: matchId, home, away },
+    // null (not undefined) so a previously-set shootout is cleared if the result
+    // is edited back to a non-draw. Requires home_pens/away_pens columns.
+    { match_id: matchId, home, away, home_pens: homePens ?? null, away_pens: awayPens ?? null },
     { onConflict: 'match_id' },
   );
 }
@@ -191,7 +195,7 @@ export async function cloudLoadAll(): Promise<CloudData> {
   const [profilesRes, betsRes, resultsRes] = await Promise.all([
     supabase.from('profiles').select('*'),
     supabase.from('bets').select('user_id, match_id, home, away, kind, pick'),
-    supabase.from('match_results').select('match_id, home, away'),
+    supabase.from('match_results').select('match_id, home, away, home_pens, away_pens'),
   ]);
 
   // Surface any read errors to the console so they're visible when debugging.
@@ -211,8 +215,12 @@ export async function cloudLoadAll(): Promise<CloudData> {
   }
 
   const matchResults: CloudData['matchResults'] = {};
-  for (const r of (resultsRes.data ?? []) as { match_id: string; home: number; away: number }[]) {
-    matchResults[r.match_id] = { home: r.home, away: r.away };
+  for (const r of (resultsRes.data ?? []) as { match_id: string; home: number; away: number; home_pens: number | null; away_pens: number | null }[]) {
+    matchResults[r.match_id] = {
+      home: r.home, away: r.away,
+      homePens: r.home_pens ?? undefined,
+      awayPens: r.away_pens ?? undefined,
+    };
   }
 
   return {

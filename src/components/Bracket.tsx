@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { GROUPS, type Match } from '../lib/data';
-import { groupStandings, KNOCKOUT_ROUNDS, FINAL_DATE } from '../lib/standings';
+import { useState, useEffect, useMemo } from 'react';
+import { GROUPS, TBD, fmtDate, type Match } from '../lib/data';
+import { groupStandings, FINAL_DATE } from '../lib/standings';
+import { bracketRounds, type BracketTie, type BracketRound } from '../lib/bracket';
 import { FlagBadge } from './Shared';
 
 function useCountdown(target: Date) {
@@ -31,6 +32,64 @@ function CountdownBox({ value, label }: { value: number; label: string }) {
   );
 }
 
+// Approximate window for each knockout round (FIFA 2026 host schedule).
+const ROUND_DATES: Record<string, string> = {
+  r32: '28 jun – 3 jul', r16: '4 – 7 jul', qf: '9 – 11 jul',
+  sf: '14 – 15 jul', third: '18 jul', final: '19 jul',
+};
+
+// One side of a tie. Greys out while still "Por definir"; the advancing team is
+// highlighted green (or marked ✓ once the tie is decided).
+function TieTeam({ team, score, winner, decided }: { team: string; score?: number; winner: boolean; decided: boolean }) {
+  const tbd = team === TBD || !team;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8,
+      background: winner ? 'rgba(34,197,94,0.10)' : 'transparent',
+    }}>
+      {tbd ? (
+        <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>?</div>
+      ) : (
+        <FlagBadge country={team} size={22} />
+      )}
+      <span style={{
+        flex: 1, minWidth: 0, fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13,
+        color: tbd ? 'rgba(255,255,255,0.3)' : winner ? '#fff' : 'rgba(255,255,255,0.7)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{tbd ? 'Por definir' : team}{winner && decided ? ' ✓' : ''}</span>
+      {score != null && (
+        <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 16, width: 20, textAlign: 'center', color: winner ? '#22C55E' : '#fff' }}>{score}</span>
+      )}
+    </div>
+  );
+}
+
+function TieCard({ tie, highlight }: { tie: BracketTie; highlight?: boolean }) {
+  const decided = !!tie.winner;
+  const live = tie.status === 'live';
+  const pens = tie.homePens != null && tie.awayPens != null;
+  return (
+    <div style={{
+      background: highlight
+        ? 'linear-gradient(135deg,rgba(201,166,44,0.14),rgba(201,166,44,0.03))'
+        : 'rgba(255,255,255,0.03)',
+      border: highlight ? '1px solid rgba(255,215,0,0.35)' : '1px solid rgba(255,255,255,0.07)',
+      borderRadius: 12, padding: 5, marginBottom: 8,
+    }}>
+      <TieTeam team={tie.home} score={tie.homeScore} winner={decided && tie.winner === tie.home} decided={decided} />
+      <TieTeam team={tie.away} score={tie.awayScore} winner={decided && tie.winner === tie.away} decided={decided} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 10px 1px', fontSize: 9, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow Condensed',sans-serif" }}>
+        <span>{fmtDate(tie.date)}</span>
+        {live ? (
+          <span style={{ color: '#22C55E', fontWeight: 700 }}>● EN VIVO</span>
+        ) : pens ? (
+          <span style={{ color: '#FFD700' }}>PENALES {tie.homePens}–{tie.awayPens}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 interface BracketScreenProps { matches: Match[]; }
 
 export function BracketScreen({ matches }: BracketScreenProps) {
@@ -39,6 +98,16 @@ export function BracketScreen({ matches }: BracketScreenProps) {
   const standings = groupStandings(activeGroup, matches);
   const groupColor = GROUPS[activeGroup]?.color || '#FFD700';
   const anyPlayed = standings.some(r => r.played > 0);
+
+  // The live bracket: App already resolved the knockout, so this just reshapes
+  // the matches into rounds. Updates automatically as results come in.
+  const rounds = useMemo(() => bracketRounds(matches), [matches]);
+  const champion = rounds.find(r => r.key === 'final')?.ties[0]?.winner;
+
+  // Rounds with no known team yet start collapsed to keep the view tidy.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const isOpen = (r: BracketRound) =>
+    r.key in collapsed ? !collapsed[r.key] : r.ties.some(t => t.home !== TBD || t.away !== TBD);
 
   return (
     <div style={{ padding: '82px 16px 100px', maxWidth: 600, margin: '0 auto', position: 'relative', zIndex: 1 }}>
@@ -70,6 +139,21 @@ export function BracketScreen({ matches }: BracketScreenProps) {
           MetLife Stadium · Nueva York / Nueva Jersey
         </div>
       </div>
+
+      {/* Champion banner — only once the final is decided */}
+      {champion && (
+        <div style={{
+          background: 'linear-gradient(135deg,rgba(201,166,44,0.25),rgba(201,166,44,0.05))',
+          border: '1px solid rgba(255,215,0,0.5)', borderRadius: 18, padding: '18px',
+          marginBottom: 22, textAlign: 'center', boxShadow: '0 0 30px rgba(255,215,0,0.2)',
+        }}>
+          <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, letterSpacing: 3, color: 'rgba(255,255,255,0.5)' }}>🏆 CAMPEÓN DEL MUNDO</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 8 }}>
+            <FlagBadge country={champion} size={40} />
+            <span style={{ fontFamily: "'Anton',sans-serif", fontSize: 28, letterSpacing: 1, background: 'linear-gradient(90deg,#FFE566,#C9A62C)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{champion}</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Cuadrangulares (group tables) ───────────────────────────── */}
       <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, letterSpacing: 3, color: '#fff', marginBottom: 4 }}>CUADRANGULARES</div>
@@ -129,44 +213,47 @@ export function BracketScreen({ matches }: BracketScreenProps) {
         )}
       </div>
 
-      {/* ── Knockout bracket ───────────────────────────────────────── */}
-      <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, letterSpacing: 3, color: '#fff', marginBottom: 14 }}>CAMINO A LA FINAL</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {KNOCKOUT_ROUNDS.map((round, idx) => {
+      {/* ── Knockout bracket (live) ─────────────────────────────────── */}
+      <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 22, letterSpacing: 3, color: '#fff', marginBottom: 4 }}>CAMINO A LA FINAL</div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', fontFamily: "'Barlow',sans-serif", marginBottom: 14 }}>
+        Los cruces se llenan solos a medida que avanza el torneo
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {rounds.map(round => {
+          const open = isOpen(round);
+          const decided = round.ties.filter(t => t.winner).length;
           const isFinal = round.key === 'final';
           return (
-            <div key={round.key} style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              padding: isFinal ? '18px 18px' : '14px 18px',
-              borderRadius: 16,
-              background: isFinal
-                ? 'linear-gradient(135deg,rgba(201,166,44,0.18),rgba(201,166,44,0.04))'
-                : 'rgba(255,255,255,0.03)',
-              border: isFinal ? '1px solid rgba(255,215,0,0.4)' : '1px solid rgba(255,255,255,0.07)',
-              boxShadow: isFinal ? '0 0 24px rgba(255,215,0,0.12)' : 'none',
-            }}>
-              <div style={{
-                width: 46, height: 46, flexShrink: 0, borderRadius: 12,
-                background: isFinal ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${isFinal ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: "'Anton',sans-serif", fontSize: isFinal ? 22 : 15,
-                color: isFinal ? '#FFD700' : 'rgba(255,255,255,0.6)',
-              }}>{isFinal ? '🏆' : round.slots}</div>
-              <div style={{ flex: 1 }}>
+            <div key={round.key} style={{ marginBottom: 8 }}>
+              <button onClick={() => setCollapsed(p => ({ ...p, [round.key]: open }))} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                padding: '12px 16px', borderRadius: 14, textAlign: 'left',
+                background: isFinal ? 'linear-gradient(135deg,rgba(201,166,44,0.18),rgba(201,166,44,0.04))' : 'rgba(255,255,255,0.04)',
+                border: isFinal ? '1px solid rgba(255,215,0,0.4)' : '1px solid rgba(255,255,255,0.08)',
+              }}>
                 <div style={{
-                  fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
-                  fontSize: isFinal ? 18 : 15, letterSpacing: 2,
-                  color: isFinal ? '#FFD700' : '#fff',
-                }}>{round.name}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: "'Barlow',sans-serif", marginTop: 2 }}>
-                  {isFinal ? 'El ganador se lleva la Copa del Mundo' : `${round.slots} ${round.slots === 1 ? 'llave' : 'llaves'} · ${round.slots * 2} equipos`}
+                  width: 40, height: 40, flexShrink: 0, borderRadius: 11,
+                  background: isFinal ? 'rgba(255,215,0,0.15)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${isFinal ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: "'Anton',sans-serif", fontSize: isFinal ? 20 : 14,
+                  color: isFinal ? '#FFD700' : 'rgba(255,255,255,0.6)',
+                }}>{isFinal ? '🏆' : round.ties.length}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: isFinal ? 17 : 15, letterSpacing: 1.5, color: isFinal ? '#FFD700' : '#fff' }}>{round.name}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: "'Barlow',sans-serif", marginTop: 2 }}>
+                    {ROUND_DATES[round.key]} · {decided}/{round.ties.length} definido{round.ties.length === 1 ? '' : 's'}
+                  </div>
                 </div>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 12, color: isFinal ? '#FFD700' : 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>{round.dateRange}</div>
-                {idx < KNOCKOUT_ROUNDS.length - 1 && <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.2)', marginTop: 2 }}>▼</div>}
-              </div>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
+              </button>
+
+              {open && (
+                <div style={{ padding: '8px 2px 0' }}>
+                  {round.ties.map(t => <TieCard key={t.id} tie={t} highlight={isFinal} />)}
+                </div>
+              )}
             </div>
           );
         })}

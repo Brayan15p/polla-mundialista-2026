@@ -16,6 +16,12 @@ function normalizeName(name: string): string {
   return NAME_MAP[name] ?? name;
 }
 
+// Order-independent team-pair key, so a match is found even when the API lists
+// home/away the other way around than our fixture (common in knockout games).
+function pairKey(a: string, b: string): string {
+  return [a, b].sort().join('|');
+}
+
 export default async function handler(req: any, res: any) {
   const footballApiKey = process.env.VITE_FOOTBALL_API_KEY;
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -76,11 +82,14 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  // Build a lookup: "HomeTeam|AwayTeam" -> stable match id
-  const matchLookup = new Map<string, string>();
+  // Build an order-independent lookup → { id, home, away } so we can both find
+  // the match (whatever order the API uses) and re-orient the score to our
+  // canonical home/away.
+  const matchLookup = new Map<string, { id: string; home: string; away: string }>();
   for (const row of dbMatches ?? []) {
-    const key = `${row.home_team}|${row.away_team}`;
-    matchLookup.set(key, row.id);
+    matchLookup.set(pairKey(row.home_team, row.away_team), {
+      id: row.id, home: row.home_team, away: row.away_team,
+    });
   }
 
   let updated = 0;
@@ -91,22 +100,27 @@ export default async function handler(req: any, res: any) {
     const homeNorm = normalizeName(homeRaw);
     const awayNorm = normalizeName(awayRaw);
 
-    const key = `${homeNorm}|${awayNorm}`;
-    const stableId = matchLookup.get(key);
+    const slot = matchLookup.get(pairKey(homeNorm, awayNorm));
 
-    if (!stableId) {
+    if (!slot) {
       errors.push(`No stable ID found for match: "${homeNorm}" vs "${awayNorm}" (raw: "${homeRaw}" vs "${awayRaw}")`);
       continue;
     }
 
-    const homeScore: number | null = match.score?.fullTime?.home ?? null;
-    const awayScore: number | null = match.score?.fullTime?.away ?? null;
+    const apiHome: number | null = match.score?.fullTime?.home ?? null;
+    const apiAway: number | null = match.score?.fullTime?.away ?? null;
+    // If the API lists our away team as its home, swap the score so it matches
+    // our fixture's orientation (otherwise a reversed knockout tie would record
+    // the result backwards).
+    const reversed = slot.home !== homeNorm;
+    const homeScore = reversed ? apiAway : apiHome;
+    const awayScore = reversed ? apiHome : apiAway;
 
     const { error: upsertError } = await supabase
       .from('match_results')
       .upsert(
         {
-          match_id: stableId,
+          match_id: slot.id,
           home_score: homeScore,
           away_score: awayScore,
           status: match.status,
@@ -116,7 +130,7 @@ export default async function handler(req: any, res: any) {
       );
 
     if (upsertError) {
-      errors.push(`Upsert failed for match ${stableId}: ${upsertError.message}`);
+      errors.push(`Upsert failed for match ${slot.id}: ${upsertError.message}`);
     } else {
       updated++;
     }

@@ -32,7 +32,33 @@ export interface Match {
   status: MatchStatus;
   homeScore?: number;
   awayScore?: number;
+  // Penalty-shootout scores — only set for knockout ties that ended level after
+  // 90'/extra time. Used to decide who advances (the score line stays the draw).
+  homePens?: number;
+  awayPens?: number;
   minute?: number;
+}
+
+// Who advances from a knockout match. Returns the team name, or undefined while
+// the result isn't decided yet (not finished, scores missing, or a draw with no
+// penalty winner recorded). Group matches can legitimately end in a draw, so
+// this is only meaningful for knockout ties.
+export function knockoutWinner(m: Match): string | undefined {
+  if (m.status !== 'finished' || m.homeScore == null || m.awayScore == null) return undefined;
+  if (m.homeScore > m.awayScore) return m.home;
+  if (m.homeScore < m.awayScore) return m.away;
+  // Level on the scoreboard → decided on penalties if we have them.
+  if (m.homePens != null && m.awayPens != null && m.homePens !== m.awayPens)
+    return m.homePens > m.awayPens ? m.home : m.away;
+  return undefined;
+}
+
+// The team eliminated in a knockout tie (mirror of knockoutWinner) — used to
+// feed the third-place playoff with the two losing semifinalists.
+export function knockoutLoser(m: Match): string | undefined {
+  const w = knockoutWinner(m);
+  if (!w) return undefined;
+  return w === m.home ? m.away : m.home;
 }
 
 // Are both teams of a match known yet? (knockout matches start as TBD)

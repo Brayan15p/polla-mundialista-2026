@@ -6,7 +6,7 @@
 // no key/proxy is configured — or any request fails — we fall back to the
 // bundled MATCHES so the app always works offline.
 
-import { MATCHES, FLAGS, type Match, type MatchStatus } from './data';
+import { MATCHES, FLAGS, TBD, type Match, type MatchStatus } from './data';
 
 // Map API team names → names used in our fixture/FLAGS table
 const NAME_MAP: Record<string, string> = {
@@ -40,7 +40,10 @@ export interface RawMatch {
   status: string;
   homeTeam: RawTeam;
   awayTeam: RawTeam;
-  score?: { fullTime?: { home: number | null; away: number | null } };
+  score?: {
+    fullTime?: { home: number | null; away: number | null };
+    penalties?: { home: number | null; away: number | null };
+  };
   minute?: number;
 }
 
@@ -59,6 +62,7 @@ function teamName(t: RawTeam): string {
 
 export function mapMatch(m: RawMatch, idx: number): Match {
   const ft = m.score?.fullTime;
+  const pk = m.score?.penalties;
   const group = (m.group || '').replace(/^GROUP_/i, '').trim() || '?';
   const home = teamName(m.homeTeam);
   const away = teamName(m.awayTeam);
@@ -82,8 +86,44 @@ export function mapMatch(m: RawMatch, idx: number): Match {
     status: mapStatus(m.status),
     homeScore: ft?.home ?? undefined,
     awayScore: ft?.away ?? undefined,
+    // Knockout ties level after 90'/extra time are decided on penalties; keep
+    // them so the bracket can advance the right side.
+    homePens: pk?.home ?? undefined,
+    awayPens: pk?.away ?? undefined,
     minute: m.minute,
   };
+}
+
+// Overlay live API data onto the bundled 104-match fixture. The curated fixture
+// (stable ids, venues, groups and the knockout SLOTS the bracket engine fills)
+// is always the backbone, so live mode never loses the knockout structure. Group
+// games are matched to their fixture slot by stable id; finished/live knockout
+// games — whose fixture slots are still "Por definir" — are appended as loose
+// entries for resolveKnockout to attach to the right slot by team pair.
+export function mergeLiveOntoFixture(raw: RawMatch[]): Match[] {
+  const live = raw.map(mapMatch);
+  const liveById = new Map(live.map(lm => [lm.id, lm]));
+  const merged = MATCHES.map(f => {
+    const lm = liveById.get(f.id); // only group games map to a fixture id
+    if (!lm) return f;
+    return {
+      ...f,
+      date: lm.date,
+      status: lm.status,
+      homeScore: lm.homeScore,
+      awayScore: lm.awayScore,
+      homePens: lm.homePens,
+      awayPens: lm.awayPens,
+      minute: lm.minute,
+    };
+  });
+  const fixtureIds = new Set(MATCHES.map(m => m.id));
+  const loose = live.filter(lm =>
+    !fixtureIds.has(lm.id) &&
+    lm.home !== TBD && lm.away !== TBD && !!lm.home && !!lm.away &&
+    (lm.status === 'finished' || lm.status === 'live'),
+  );
+  return [...merged, ...loose];
 }
 
 export interface MatchesResult {
@@ -103,9 +143,11 @@ export async function fetchMatches(signal?: AbortSignal): Promise<MatchesResult>
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as { matches?: RawMatch[] };
-    const list = (data.matches || []).map(mapMatch);
-    if (list.length === 0) throw new Error('empty response');
-    return { matches: list, source: 'live' };
+    const raw = data.matches || [];
+    if (raw.length === 0) throw new Error('empty response');
+    // Overlay live data onto the full fixture so the knockout slots the bracket
+    // engine relies on are always present (and auto-track as results come in).
+    return { matches: mergeLiveOntoFixture(raw), source: 'live' };
   } catch (err) {
     return {
       matches: MATCHES,

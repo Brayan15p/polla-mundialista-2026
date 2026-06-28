@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mapMatch, mapStatus, type RawMatch } from './api';
-import { fmtTime } from './data';
+import { mapMatch, mapStatus, mergeLiveOntoFixture, type RawMatch } from './api';
+import { fmtTime, MATCHES, TBD } from './data';
 
 // These tests pin down the API → app mapping WITHOUT hitting the network, so
 // they verify the two things that actually bite us: status mapping (live /
@@ -65,5 +65,43 @@ describe('mapMatch — kickoff in Colombia time', () => {
     const m = mapMatch(raw(), 0);
     expect(m.homeScore).toBeUndefined();
     expect(m.awayScore).toBeUndefined();
+  });
+
+  it('reads penalty scores for a knockout shootout', () => {
+    const m = mapMatch(raw({
+      status: 'FINISHED',
+      score: { fullTime: { home: 1, away: 1 }, penalties: { home: 4, away: 2 } },
+    }), 0);
+    expect(m.homePens).toBe(4);
+    expect(m.awayPens).toBe(2);
+  });
+});
+
+describe('mergeLiveOntoFixture', () => {
+  it('keeps the full 104-match fixture backbone and overlays group scores', () => {
+    // A live group game between two real fixture rivals.
+    const g = MATCHES.find(m => m.group)!;
+    const out = mergeLiveOntoFixture([raw({
+      homeTeam: { name: g.home }, awayTeam: { name: g.away },
+      group: 'GROUP_' + g.group, status: 'FINISHED',
+      score: { fullTime: { home: 3, away: 0 } },
+    })]);
+    // All 104 fixture slots survive (incl. the 32 knockout slots the bracket needs).
+    expect(out.filter(m => MATCHES.some(f => f.id === m.id))).toHaveLength(104);
+    const scored = out.find(m => m.id === g.id)!;
+    expect(scored.status).toBe('finished');
+    expect(scored.homeScore).toBe(3);
+  });
+
+  it('appends a finished knockout game as a loose entry (real teams, no fixture slot)', () => {
+    const out = mergeLiveOntoFixture([raw({
+      homeTeam: { name: 'Brazil' }, awayTeam: { name: 'France' },
+      group: null, status: 'FINISHED', score: { fullTime: { home: 2, away: 1 } },
+    })]);
+    const loose = out.find(m => m.home === 'Brazil' && m.away === 'France');
+    expect(loose).toBeDefined();
+    expect(loose!.status).toBe('finished');
+    // The knockout fixture slots are still waiting to be filled by the engine.
+    expect(out.some(m => m.stage && m.home === TBD)).toBe(true);
   });
 });

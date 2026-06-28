@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { pointsFor, type Match, type BetKind, type Outcome } from './lib/data';
 import { fetchMatches } from './lib/api';
+import { resolveKnockout } from './lib/bracket';
 import { loadState, saveState, isAdmin, type AppState, type User, type View } from './lib/state';
 import { supabaseEnabled } from './lib/supabase';
 import {
@@ -68,19 +69,6 @@ export default function App() {
     return () => { active = false; unsub(); };
   }, []);
 
-  // Auto-sync kickoff times whenever a super user logs in, so the server-side
-  // betting lock stays current without anyone pressing "Sincronizar partidos".
-  const autoSynced = useRef(false);
-  useEffect(() => {
-    if (!supabaseEnabled || autoSynced.current || baseMatches.length === 0) return;
-    if (!state.currentUser || !isAdmin(state.currentUser)) return;
-    autoSynced.current = true;
-    cloudSyncMatches(baseMatches).then(r => {
-      if (r.error) console.warn('[cloud] auto-sync de partidos falló:', r.error);
-      else console.info('[cloud] horarios de partidos sincronizados automáticamente');
-    });
-  }, [state.currentUser, baseMatches]);
-
   // Auto-sync results every 5 minutes while admin has the app open.
   // More reliable than GitHub Actions cron for free tier repos.
   useEffect(() => {
@@ -100,11 +88,39 @@ export default function App() {
   // Persist on change (local mode only — cloud mode is the source of truth).
   useEffect(() => { if (!supabaseEnabled) saveState(state); }, [state]);
 
-  // Merge admin result overrides into match list
-  const matches = useMemo(() => baseMatches.map(m => {
-    const r = state.matchResults[m.id];
-    return r ? { ...m, homeScore: r.home, awayScore: r.away, status: 'finished' as const } : m;
-  }), [baseMatches, state.matchResults]);
+  // Merge admin/cloud result overrides into the match list, then resolve the
+  // knockout bracket: group winners/runners-up + best thirds fill the Round of 32,
+  // and every tie's winner propagates up to the final — automatically, as results
+  // arrive. Pure; nothing is fabricated (unknown slots stay "Por definir").
+  const matches = useMemo(() => {
+    const merged = baseMatches.map(m => {
+      const r = state.matchResults[m.id];
+      return r ? { ...m, homeScore: r.home, awayScore: r.away, status: 'finished' as const } : m;
+    });
+    return resolveKnockout(merged);
+  }, [baseMatches, state.matchResults]);
+
+  // Signature of the current knockout matchups — changes only when group results
+  // decide (or live results advance) a tie. Drives the auto-sync below so we push
+  // the cloud fixture again exactly when the bracket moves, not on every render.
+  const knockoutSig = useMemo(
+    () => matches.filter(m => m.stage).map(m => `${m.id}:${m.home}/${m.away}`).join('|'),
+    [matches],
+  );
+
+  // Auto-sync the fixture to the cloud whenever a super user is present and the
+  // knockout matchups change. This keeps the server-side betting lock current AND
+  // lets /api/sync-results map live knockout games — which the API reports under
+  // real team names — onto our stable slot ids by team pair, so 16vos → octavos →
+  // cuartos → semis → final all track automatically.
+  useEffect(() => {
+    if (!supabaseEnabled || matches.length === 0) return;
+    if (!state.currentUser || !isAdmin(state.currentUser)) return;
+    cloudSyncMatches(matches).then(r => {
+      if (r.error) console.warn('[cloud] auto-sync de partidos falló:', r.error);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentUser, knockoutSig]);
 
   // Celebrate when a result posts and the user's own bet won points (once each).
   useEffect(() => {

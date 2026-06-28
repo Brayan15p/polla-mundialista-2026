@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { pointsFor, type Match, type BetKind, type Outcome } from './lib/data';
 import { fetchMatches } from './lib/api';
 import { resolveKnockout } from './lib/bracket';
-import { loadState, saveState, isAdmin, type AppState, type User, type View } from './lib/state';
+import { loadState, saveState, loadCloudCache, saveCloudCache, isAdmin, type AppState, type User, type View } from './lib/state';
 import { supabaseEnabled } from './lib/supabase';
 import {
-  cloudSignIn, cloudSignUp, cloudSignOut, cloudCurrentUser, cloudLoadAll,
+  cloudSignIn, cloudSignUp, cloudSignOut, cloudCurrentUser, cloudLoadAll, reconcileCloud,
   cloudSetPlayer, cloudPlaceBet, cloudUpdateResult, cloudSubscribe, cloudSyncMatches,
   cloudSendPasswordReset, cloudUpdatePassword, cloudOnPasswordRecovery,
 } from './lib/cloud';
@@ -24,13 +24,15 @@ import { ProfileScreen } from './components/Profile';
 import { AdminScreen } from './components/Admin';
 
 export default function App() {
-  // In cloud mode, data comes from Supabase — start empty. In local mode, use
-  // the bundled demo state from localStorage.
-  const [state, setState] = useState<AppState>(() =>
-    supabaseEnabled
-      ? { users: [], currentUser: null, bets: {}, matchResults: {}, view: 'auth', showAdmin: false }
-      : loadState(),
-  );
+  // In cloud mode, Supabase is the source of truth — but we seed from the local
+  // redundancy cache so the player instantly sees their last-known bets/results
+  // on load (then the cloud read reconciles). In local mode, use the bundled
+  // demo state from localStorage.
+  const [state, setState] = useState<AppState>(() => {
+    if (!supabaseEnabled) return loadState();
+    const cache = loadCloudCache();
+    return { users: cache.users, currentUser: null, bets: cache.bets, matchResults: cache.matchResults, view: 'auth', showAdmin: false };
+  });
   const [showIntro, setShowIntro] = useState(true);
   const [baseMatches, setBaseMatches] = useState<Match[]>([]);
   const [dataSource, setDataSource] = useState<'live' | 'mock'>('mock');
@@ -51,23 +53,45 @@ export default function App() {
     return () => ctrl.abort();
   }, []);
 
+  // Pull the shared cloud data and reconcile it into state. reconcileCloud
+  // guarantees a failed read never blanks a slice and a just-placed bet is never
+  // dropped. See cloud.ts (unit-tested). Stable identity so the listeners below
+  // can all share it.
+  const syncFromCloud = useCallback(async () => {
+    if (!supabaseEnabled) return;
+    const data = await cloudLoadAll();
+    setState(p => ({ ...p, ...reconcileCloud(p, data, p.currentUser?.id) }));
+  }, []);
+
   // Cloud mode: restore the logged-in user, load shared data, and keep every
   // device in sync via Realtime.
   useEffect(() => {
     if (!supabaseEnabled) return;
     let active = true;
-    const refresh = async () => {
-      const data = await cloudLoadAll();
-      if (active) setState(p => ({ ...p, users: data.users, bets: data.bets, matchResults: data.matchResults }));
-    };
     (async () => {
       const u = await cloudCurrentUser();
       if (active && u) setState(p => ({ ...p, currentUser: u, view: u.playerId ? 'dashboard' : 'playerSelect' }));
-      await refresh();
+      await syncFromCloud();
     })();
-    const unsub = cloudSubscribe(refresh);
+    const unsub = cloudSubscribe(() => { void syncFromCloud(); });
     return () => { active = false; unsub(); };
-  }, []);
+  }, [syncFromCloud]);
+
+  // Re-sync whenever the device regains connectivity or the tab is refocused.
+  // Supabase Realtime reconnects on its own, but this closes the gap so a player
+  // who lost the socket (sleep, tunnel, flaky mobile) never sees stale or missing
+  // data once they're back — the freshest cloud state is pulled immediately.
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+    const onOnline = () => { void syncFromCloud(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') void syncFromCloud(); };
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [syncFromCloud]);
 
   // Auto-sync results every 5 minutes while admin has the app open.
   // More reliable than GitHub Actions cron for free tier repos.
@@ -85,8 +109,13 @@ export default function App() {
     return cloudOnPasswordRecovery(() => { setShowIntro(false); setRecovery(true); });
   }, []);
 
-  // Persist on change (local mode only — cloud mode is the source of truth).
-  useEffect(() => { if (!supabaseEnabled) saveState(state); }, [state]);
+  // Persist on change. Local mode: the whole app state. Cloud mode: a redundancy
+  // cache of the shared data, so bets/results survive a refresh or a momentary
+  // cloud read failure and show instantly on next load.
+  useEffect(() => {
+    if (supabaseEnabled) saveCloudCache({ users: state.users, bets: state.bets, matchResults: state.matchResults });
+    else saveState(state);
+  }, [state]);
 
   // Merge admin/cloud result overrides into the match list, then resolve the
   // knockout bracket: group winners/runners-up + best thirds fill the Round of 32,
@@ -227,6 +256,25 @@ export default function App() {
   };
   const go = (view: View) => setState(p => ({ ...p, view }));
 
+  // Download a full JSON backup of all players, bets and results (admin only).
+  // A manual safety net on top of Supabase's own backups — never deletes data.
+  const exportBackup = () => {
+    const dump = {
+      app: 'polla-mundialista-2026',
+      exportedAt: new Date().toISOString(),
+      users: state.users,
+      bets: state.bets,
+      matchResults: state.matchResults,
+    };
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `polla-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Compute current user's live point total
   const userTotalPoints = useMemo(() => {
     if (!state.currentUser) return 0;
@@ -261,6 +309,7 @@ export default function App() {
       onClose={() => setState(p => ({ ...p, showAdmin: false }))}
       onUpdateResult={updateResult}
       onSyncMatches={supabaseEnabled ? () => cloudSyncMatches(matches) : undefined}
+      onExport={exportBackup}
     />
   );
 

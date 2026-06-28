@@ -33,6 +33,10 @@ export interface CloudData {
   users: User[];
   bets: Record<string, Record<string, Bet>>;
   matchResults: Record<string, { home: number; away: number }>;
+  // Per-table read success. The caller MUST only overwrite a slice of state when
+  // its flag is true — otherwise a momentary read failure would blank the UI
+  // even though the data is safe in the database.
+  ok: { users: boolean; bets: boolean; results: boolean };
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────
@@ -181,7 +185,7 @@ export async function cloudSyncMatches(matches: Match[]): Promise<{ error?: stri
 
 // ── Reads ───────────────────────────────────────────────────────────────
 export async function cloudLoadAll(): Promise<CloudData> {
-  const empty: CloudData = { users: [], bets: {}, matchResults: {} };
+  const empty: CloudData = { users: [], bets: {}, matchResults: {}, ok: { users: false, bets: false, results: false } };
   if (!supabase) return empty;
 
   const [profilesRes, betsRes, resultsRes] = await Promise.all([
@@ -211,7 +215,38 @@ export async function cloudLoadAll(): Promise<CloudData> {
     matchResults[r.match_id] = { home: r.home, away: r.away };
   }
 
-  return { users, bets, matchResults };
+  return {
+    users, bets, matchResults,
+    ok: { users: !profilesRes.error, bets: !betsRes.error, results: !resultsRes.error },
+  };
+}
+
+// Slices the UI keeps in sync with the cloud.
+export interface SharedSlices {
+  users: User[];
+  bets: CloudData['bets'];
+  matchResults: CloudData['matchResults'];
+}
+
+// Merge a cloud read into the current in-memory slices WITHOUT ever losing data.
+// Two guarantees, both critical so a player never "loses" what they entered:
+//   1. A slice whose cloud read FAILED keeps its previous value — a network or
+//      RLS hiccup can never blank the screen (the data is safe in the DB).
+//   2. The current user's freshly-placed bets are preserved even if the cloud
+//      read hasn't returned them yet; the cloud value wins on a real conflict.
+// Pure (no I/O) so it can be unit-tested.
+export function reconcileCloud(prev: SharedSlices, data: CloudData, uid?: string): SharedSlices {
+  let bets = prev.bets;
+  if (data.ok.bets) {
+    bets = uid
+      ? { ...data.bets, [uid]: { ...(prev.bets[uid] || {}), ...(data.bets[uid] || {}) } }
+      : data.bets;
+  }
+  return {
+    users: data.ok.users ? data.users : prev.users,
+    bets,
+    matchResults: data.ok.results ? data.matchResults : prev.matchResults,
+  };
 }
 
 // ── Diagnostics ────────────────────────────────────────────────────────

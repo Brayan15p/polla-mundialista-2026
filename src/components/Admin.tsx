@@ -7,9 +7,10 @@ interface AdminScreenProps {
   onClose: () => void;
   onUpdateResult: (matchId: string, home: number, away: number) => void;
   onSyncMatches?: () => Promise<{ error?: string }>;
+  onExport?: () => void;
 }
 
-export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches }: AdminScreenProps) {
+export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches, onExport }: AdminScreenProps) {
   const [vals, setVals] = useState<Record<string, { home: string; away: string }>>(
     Object.fromEntries(matches.map(m => [m.id, { home: m.homeScore?.toString() ?? '', away: m.awayScore?.toString() ?? '' }]))
   );
@@ -57,6 +58,20 @@ export function AdminScreen({ matches, onClose, onUpdateResult, onSyncMatches }:
               fontSize: 13, letterSpacing: 1, cursor: 'pointer',
             }}>🔄 SINCRONIZAR PARTIDOS</button>
             {syncMsg && <span style={{ marginLeft: 12, fontSize: 12, color: 'rgba(255,255,255,0.7)', fontFamily: "'Barlow',sans-serif" }}>{syncMsg}</span>}
+          </div>
+        )}
+        {/* Backup panel */}
+        {onExport && (
+          <div style={{ marginBottom: 20, padding: '14px 16px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: 14 }}>
+            <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700, fontSize: 13, color: '#22C55E', letterSpacing: 1 }}>💾 RESPALDO (BACKUP)</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: "'Barlow',sans-serif", margin: '4px 0 10px', lineHeight: 1.5 }}>
+              Descarga un JSON con todos los jugadores, apuestas y resultados. Guárdalo seguro: es un respaldo manual además de los backups de Supabase.
+            </div>
+            <button onClick={onExport} style={{
+              padding: '10px 18px', background: 'linear-gradient(135deg,#4ADE80,#16A34A)', border: 'none',
+              borderRadius: 10, color: '#000', fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 700,
+              fontSize: 13, letterSpacing: 1, cursor: 'pointer',
+            }}>💾 DESCARGAR BACKUP (JSON)</button>
           </div>
         )}
         {/* Diagnostics panel */}

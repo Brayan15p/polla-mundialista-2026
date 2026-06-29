@@ -87,6 +87,10 @@ export default async function handler(req: any, res: any) {
   // canonical home/away.
   const matchLookup = new Map<string, { id: string; home: string; away: string }>();
   for (const row of dbMatches ?? []) {
+    // Skip loose duplicates: only ever record a result onto a STABLE slot id.
+    // Otherwise a duplicate "api-*" row could win the lookup and the result would
+    // land on an id nobody bet on.
+    if (typeof row.id === 'string' && row.id.startsWith('api-')) continue;
     matchLookup.set(pairKey(row.home_team, row.away_team), {
       id: row.id, home: row.home_team, away: row.away_team,
     });
@@ -109,21 +113,29 @@ export default async function handler(req: any, res: any) {
 
     const apiHome: number | null = match.score?.fullTime?.home ?? null;
     const apiAway: number | null = match.score?.fullTime?.away ?? null;
+    const apiHomePens: number | null = match.score?.penalties?.home ?? null;
+    const apiAwayPens: number | null = match.score?.penalties?.away ?? null;
     // If the API lists our away team as its home, swap the score so it matches
     // our fixture's orientation (otherwise a reversed knockout tie would record
     // the result backwards).
     const reversed = slot.home !== homeNorm;
     const homeScore = reversed ? apiAway : apiHome;
     const awayScore = reversed ? apiHome : apiAway;
+    const homePens = reversed ? apiAwayPens : apiHomePens;
+    const awayPens = reversed ? apiHomePens : apiAwayPens;
 
+    // The match_results table is keyed by match_id and uses home/away (+ pens) —
+    // the SAME columns the app reads. (It previously wrote home_score/away_score/
+    // status, columns that don't exist, so this endpoint never persisted anything.)
     const { error: upsertError } = await supabase
       .from('match_results')
       .upsert(
         {
           match_id: slot.id,
-          home_score: homeScore,
-          away_score: awayScore,
-          status: match.status,
+          home: homeScore,
+          away: awayScore,
+          home_pens: homePens,
+          away_pens: awayPens,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'match_id' }

@@ -198,11 +198,13 @@ export function resolveKnockout(matches: Match[]): Match[] {
   // admin results need no special handling (the latter already sit on the slot id).
   const koIds = new Set(Object.values(MATCHNO_TO_ID));
   const pairKey = (a: string, b: string) => [a, b].sort().join(' × ');
-  const loose = new Map<string, Match>();
+  const loose = new Map<string, Match>();     // scored loose KO games (to graft)
+  const looseAll = new Map<string, Match>();  // every loose KO entry (to de-dup)
   for (const m of matches) {
     if (koIds.has(m.id)) continue;                       // already a KO slot
     if (m.group && m.group !== '?') continue;            // a group-stage game
     if (!m.home || !m.away || m.home === TBD || m.away === TBD) continue;
+    looseAll.set(pairKey(m.home, m.away), m);
     if (m.homeScore == null || m.awayScore == null) continue;
     loose.set(pairKey(m.home, m.away), m);
   }
@@ -258,22 +260,26 @@ export function resolveKnockout(matches: Match[]): Match[] {
       }
     }
     // Graft a live API result onto a still-open slot whose teams are now known,
-    // re-orienting the score if the API lists the pair the other way around.
-    if (m.status !== 'finished' && m.home !== TBD && m.away !== TBD) {
-      const hit = loose.get(pairKey(m.home, m.away));
-      if (hit) {
-        const flip = hit.home !== m.home;
+    // re-orienting the score if the API lists the pair the other way around. Even
+    // when the slot already has a result, still mark the loose entry absorbed so
+    // the same game never appears twice (it used to linger and re-pollute the
+    // cloud matches table on every sync).
+    if (m.home !== TBD && m.away !== TBD) {
+      const scored = loose.get(pairKey(m.home, m.away));
+      if (scored && m.status !== 'finished') {
+        const flip = scored.home !== m.home;
         m = {
           ...m,
-          homeScore: flip ? hit.awayScore : hit.homeScore,
-          awayScore: flip ? hit.homeScore : hit.awayScore,
-          homePens: flip ? hit.awayPens : hit.homePens,
-          awayPens: flip ? hit.homePens : hit.awayPens,
-          status: hit.status,
-          minute: hit.minute,
+          homeScore: flip ? scored.awayScore : scored.homeScore,
+          awayScore: flip ? scored.homeScore : scored.awayScore,
+          homePens: flip ? scored.awayPens : scored.homePens,
+          awayPens: flip ? scored.homePens : scored.awayPens,
+          status: scored.status,
+          minute: scored.minute,
         };
-        absorbed.add(hit.id);
       }
+      const dup = looseAll.get(pairKey(m.home, m.away));
+      if (dup) absorbed.add(dup.id);
     }
     resolved[mn] = m;
   }

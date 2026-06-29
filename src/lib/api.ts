@@ -74,23 +74,31 @@ export function mapMatch(m: RawMatch, idx: number): Match {
   // convert it correctly.
   const date = m.utcDate || `2026-06-12T${String(12 + (idx % 8)).padStart(2, '0')}:00-05:00`;
   // Use the fixture match for stable ID, venue, group and stage — API returns
-  // numeric ids ('api-123') that change across requests and would orphan saved bets.
-  const fixtureMatch = MATCHES.find(f => f.home === home && f.away === away);
+  // numeric ids ('api-123') that change across requests and would orphan saved
+  // bets. Match the fixture slot by an ORDER-INDEPENDENT team pair: the API often
+  // lists a game with home/away swapped vs our fixture (it left England vs Panama
+  // unscored because the API sent "Panama vs England"). When the orientation is
+  // flipped we adopt the fixture's canonical home/away AND swap the score/pens to
+  // match, so the result lands on the right slot the right way around.
+  const fixtureMatch =
+    MATCHES.find(f => f.home === home && f.away === away) ??
+    MATCHES.find(f => f.home === away && f.away === home);
+  const flip = !!fixtureMatch && fixtureMatch.home !== home;
   return {
     id: fixtureMatch?.id ?? ('api-' + m.id),
     group: fixtureMatch?.group ?? group,
     stage: fixtureMatch?.stage,
-    home,
-    away,
+    home: fixtureMatch?.home ?? home,
+    away: fixtureMatch?.away ?? away,
     date,
     venue: fixtureMatch?.venue || 'TBD',
     status: mapStatus(m.status),
-    homeScore: ft?.home ?? undefined,
-    awayScore: ft?.away ?? undefined,
+    homeScore: (flip ? ft?.away : ft?.home) ?? undefined,
+    awayScore: (flip ? ft?.home : ft?.away) ?? undefined,
     // Knockout ties level after 90'/extra time are decided on penalties; keep
     // them so the bracket can advance the right side.
-    homePens: pk?.home ?? undefined,
-    awayPens: pk?.away ?? undefined,
+    homePens: (flip ? pk?.away : pk?.home) ?? undefined,
+    awayPens: (flip ? pk?.home : pk?.away) ?? undefined,
     minute: m.minute,
   };
 }

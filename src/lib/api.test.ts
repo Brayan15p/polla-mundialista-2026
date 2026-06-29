@@ -75,6 +75,24 @@ describe('mapMatch — kickoff in Colombia time', () => {
     expect(m.homePens).toBe(4);
     expect(m.awayPens).toBe(2);
   });
+
+  // Regression: the API listed a group game the other way around than our fixture
+  // (it sent "Panama vs England" for fixture L5 "England vs Panama"), so the exact
+  // home/away match failed, the result never reached the slot, and 12 bets went
+  // unscored. The lookup is now order-independent and re-orients the score.
+  it('maps a reversed group game onto its stable slot and re-orients the score', () => {
+    const g = MATCHES.find(m => m.group)!; // a real group fixture
+    const m = mapMatch(raw({
+      homeTeam: { name: g.away }, awayTeam: { name: g.home }, // API lists it reversed
+      group: 'GROUP_' + g.group, status: 'FINISHED',
+      score: { fullTime: { home: 0, away: 2 } },              // g.away 0 - g.home 2
+    }), 0);
+    expect(m.id).toBe(g.id);          // mapped to the stable slot, not 'api-*'
+    expect(m.home).toBe(g.home);      // canonical fixture orientation
+    expect(m.away).toBe(g.away);
+    expect(m.homeScore).toBe(2);      // g.home's 2 goals, re-oriented to the home side
+    expect(m.awayScore).toBe(0);
+  });
 });
 
 describe('mergeLiveOntoFixture', () => {
@@ -103,5 +121,19 @@ describe('mergeLiveOntoFixture', () => {
     expect(loose!.status).toBe('finished');
     // The knockout fixture slots are still waiting to be filled by the engine.
     expect(out.some(m => m.stage && m.home === TBD)).toBe(true);
+  });
+
+  it('overlays a reversed group game onto its fixture slot without a duplicate api- entry', () => {
+    const g = MATCHES.find(m => m.group)!;
+    const out = mergeLiveOntoFixture([raw({
+      homeTeam: { name: g.away }, awayTeam: { name: g.home }, // reversed vs fixture
+      group: 'GROUP_' + g.group, status: 'FINISHED',
+      score: { fullTime: { home: 0, away: 2 } },
+    })]);
+    expect(out.some(m => m.id.startsWith('api-'))).toBe(false); // no orphan duplicate
+    const slot = out.find(m => m.id === g.id)!;
+    expect(slot.status).toBe('finished');
+    expect(slot.homeScore).toBe(2); // re-oriented to the fixture's home side
+    expect(slot.awayScore).toBe(0);
   });
 });

@@ -173,6 +173,26 @@ describe('resolveKnockout — live API knockout results', () => {
     expect(knockoutWinner(slot)).toBe(r32.away); // lost the score line, won on pens
   });
 
+  it('drops a duplicate loose API entry even when the slot already has a result', () => {
+    const groups = finishGroups(VALID_THIRDS);
+    const r32 = resolveKnockout(groups).find(m => m.id === MATCHNO_TO_ID[73])!;
+    // The slot already finished (e.g. an admin-entered result) AND the API still
+    // sends the same game as a loose entry — it must not show up twice, and the
+    // existing result must NOT be overwritten.
+    const withResult = resolveKnockout(groups).map(m =>
+      m.id === MATCHNO_TO_ID[73] ? { ...m, homeScore: 2, awayScore: 0, status: 'finished' as const } : m,
+    );
+    const looseApi: Match = {
+      id: 'api-7777', group: '?', home: r32.away, away: r32.home,
+      date: '2026-06-28T12:00', venue: '', status: 'finished', homeScore: 1, awayScore: 3,
+    };
+    const out = resolveKnockout([...withResult, looseApi]);
+    expect(out.find(m => m.id === 'api-7777')).toBeUndefined(); // duplicate gone
+    const slot = out.find(m => m.id === MATCHNO_TO_ID[73])!;
+    expect(slot.homeScore).toBe(2); // existing result preserved, not grafted over
+    expect(slot.awayScore).toBe(0);
+  });
+
   it('leaves a group-stage result untouched even if those teams meet again in KO', () => {
     // Sanity: loose attachment must never absorb a group game (it would corrupt
     // standings). A group game keeps its group key, so it is ignored as a source.

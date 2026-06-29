@@ -171,7 +171,11 @@ export async function cloudUpdateResult(
 // anti-fraud trigger can enforce the betting deadline. See supabase/anti_fraud.sql.
 export async function cloudSyncMatches(matches: Match[]): Promise<{ error?: string }> {
   if (!supabase) return { error: 'Supabase no configurado' };
-  const rows = matches.map(m => ({
+  // Never persist loose live-API entries ('api-<numericId>'): they are duplicates
+  // of a stable fixture slot (same game, different id). They used to re-pollute the
+  // matches table on every sync and also broke the result→slot lookup, which left
+  // a reversed game (England vs Panama) scoring nobody.
+  const rows = matches.filter(m => !m.id.startsWith('api-')).map(m => ({
     id: m.id,
     home_team: m.home,
     away_team: m.away,

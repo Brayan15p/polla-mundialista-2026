@@ -1,0 +1,56 @@
+name: healthcheck
+
+# Auto-auditor de la polla: cada 30 min golpea /api/health en produccion y
+# verifica que la web sirve Y que las invariantes siguen sanas (fixture de 104
+# partidos, 0 duplicados api-*, 0 apuestas huerfanas). Si algo falla, el job
+# falla y GitHub te avisa por correo. El log de cada corrida queda en la pestania
+# Actions del repo (historial de 90 dias) y en el resumen del job.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # cada 30 min (UTC). El cron gratis de GitHub puede
+                             # demorarse unos minutos en picos; para un health
+                             # check es de sobra.
+  workflow_dispatch:          # boton para correrlo a mano cuando quieras
+
+# Si dispararas varias seguidas, deja solo la ultima.
+concurrency:
+  group: healthcheck
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    env:
+      HEALTH_URL: https://polla-mundialista-2026-psi.vercel.app/api/health
+    steps:
+      - name: Llamar /api/health
+        run: |
+          set -o pipefail
+          echo "Auditando $HEALTH_URL  ($(date -u '+%Y-%m-%d %H:%M:%SZ'))"
+          # -s silencioso, -m timeout, -w guarda el codigo HTTP aparte del body.
+          BODY=$(curl -s -m 25 -w '\n%{http_code}' "$HEALTH_URL") || {
+            echo "❌ No se pudo contactar la web (curl fallo)"; exit 1; }
+          CODE=$(printf '%s' "$BODY" | tail -n1)
+          JSON=$(printf '%s' "$BODY" | sed '$d')
+
+          echo "HTTP $CODE"
+          echo "$JSON" | jq . 2>/dev/null || echo "$JSON"
+
+          # Resumen bonito en la pestania del job.
+          {
+            echo "## Healthcheck $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo ""
+            echo "HTTP **$CODE** — \`$HEALTH_URL\`"
+            echo ""
+            echo '```json'
+            echo "$JSON" | jq . 2>/dev/null || echo "$JSON"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          OK=$(echo "$JSON" | jq -r '.ok' 2>/dev/null)
+          if [ "$CODE" != "200" ] || [ "$OK" != "true" ]; then
+            echo "❌ La polla NO esta sana (HTTP $CODE, ok=$OK). Revisa los checks de arriba."
+            exit 1
+          fi
+          echo "✅ Todo OK: web sirviendo, fixture intacto, sin duplicados, sin apuestas huerfanas."

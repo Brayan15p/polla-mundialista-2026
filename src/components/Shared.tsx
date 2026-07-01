@@ -197,7 +197,7 @@ export function LiveCard({ match, bet }: { match: Match; bet?: { home: number; a
         </div>
         <div style={{ textAlign: 'center', minWidth: 100 }}>
           <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 50, color: '#fff', lineHeight: 1, letterSpacing: 2 }}>
-            {match.homeScore}<span style={{ color: 'rgba(255,255,255,0.25)', margin: '0 4px' }}>–</span>{match.awayScore}
+            {match.homeScore ?? 0}<span style={{ color: 'rgba(255,255,255,0.25)', margin: '0 4px' }}>–</span>{match.awayScore ?? 0}
           </div>
           {bet && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: "'Barlow',sans-serif", marginTop: 6 }}>Tu apuesta: {bet.home}–{bet.away}</div>}
         </div>

@@ -161,7 +161,7 @@ export function MatchBetCard({ match, bet, canBetNow, onBet, participants }: Mat
           <div style={{ textAlign: 'center', minWidth: 120, flexShrink: 0 }}>
             {isDone || isLive ? (
               <div style={{ fontFamily: "'Anton',sans-serif", fontSize: 44, color: '#fff', lineHeight: 1, letterSpacing: 2 }}>
-                {match.homeScore}<span style={{ color: 'rgba(255,255,255,0.22)', margin: '0 6px', fontSize: 32 }}>–</span>{match.awayScore}
+                {match.homeScore ?? 0}<span style={{ color: 'rgba(255,255,255,0.22)', margin: '0 6px', fontSize: 32 }}>–</span>{match.awayScore ?? 0}
               </div>
             ) : editing && canBetNow && kind === 'score' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>

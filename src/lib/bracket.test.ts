@@ -193,6 +193,24 @@ describe('resolveKnockout — live API knockout results', () => {
     expect(slot.awayScore).toBe(0);
   });
 
+  it('never overrides a deterministic tie\'s opponent with an unrelated loose API entry', () => {
+    // Match 73 (KO-32avos-1) is '2A' vs '2B' — both sides fixed by group standings,
+    // no draw involved. A stray/incorrect loose API entry for the same anchor team
+    // (wrong opponent, e.g. bad data from the provider) must NEVER replace the
+    // correctly-computed away side — that previously fabricated impossible ties
+    // like "Brazil vs Norway" when the API had unrelated data for a team.
+    const groups = finishGroups(VALID_THIRDS);
+    const r32 = resolveKnockout(groups).find(m => m.id === MATCHNO_TO_ID[73])!;
+    const bogusOpponent = GROUPS['C'].teams.find(t => t !== r32.home && t !== r32.away)!;
+    const looseApi: Match = {
+      id: 'api-6666', group: '?', home: r32.home, away: bogusOpponent,
+      date: '2026-06-28T12:00', venue: '', status: 'upcoming',
+    };
+    const out = resolveKnockout([...groups, looseApi]);
+    const slot = out.find(m => m.id === MATCHNO_TO_ID[73])!;
+    expect(slot.away).toBe(r32.away);
+  });
+
   it('leaves a group-stage result untouched even if those teams meet again in KO', () => {
     // Sanity: loose attachment must never absorb a group game (it would corrupt
     // standings). A group game keeps its group key, so it is ignored as a source.

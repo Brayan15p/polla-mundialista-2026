@@ -250,9 +250,15 @@ export function resolveKnockout(matches: Match[]): Match[] {
     if (!base) continue;
     const [hs, as] = mn <= 88 ? R32_SEED[mn] : FEEDS[mn];
     let m: Match = { ...base, home: source(hs), away: source(as) };
-    // R32 only: trust the API for the real opponent of this slot's anchor (home)
-    // team, overriding a third-place guess that doesn't match the official draw.
-    if (mn <= 88 && m.home !== TBD) {
+    // R32 THIRD-PLACE TIES ONLY ('3:NN' away code): our own assignment
+    // (THIRD_SLOT_GROUPS) is a heuristic — FIFA draws the real pairing live, so
+    // when the API reports the real opponent for this slot's anchor (home) team,
+    // trust it over our guess. NEVER do this for a fully deterministic tie (both
+    // sides already fixed by group standings, e.g. '2A' vs '2B') — those are
+    // guaranteed correct from our own standings and must never be overwritten by
+    // an unrelated/incorrect loose API entry for that team (this previously
+    // fabricated impossible ties like "Brazil vs Norway").
+    if (mn <= 88 && m.home !== TBD && as.startsWith('3:')) {
       const real = apiKoByTeam.get(m.home);
       if (real) {
         const realAway = real.home === m.home ? real.away : real.home;

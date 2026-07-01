@@ -2,14 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 
 const NAME_MAP: Record<string, string> = {
   'South Korea': 'Korea Republic',
+  'Korea Republic': 'Korea Republic',
   'Iran': 'IR Iran',
   "Ivory Coast": "Côte d'Ivoire",
+  "Côte d'Ivoire": "Côte d'Ivoire",
   'Congo': 'Congo DR',
   'DR Congo': 'Congo DR',
   'Cape Verde': 'Cabo Verde',
+  'Cape Verde Islands': 'Cabo Verde',
   'Turkey': 'Türkiye',
   'Curacao': 'Curaçao',
   'Bosnia & Herzegovina': 'Bosnia and Herzegovina',
+  'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
+  'United States': 'USA',
 };
 
 function normalizeName(name: string): string {
